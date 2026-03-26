@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SessionPilot for REAPER</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top bar -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <h1 class="logo">SessionPilot</h1>
+        <span class="subtitle">for REAPER</span>
+      </div>
+      <div class="topbar-right">
+        <div id="connection-status"></div>
+        <div id="transport-display"></div>
+      </div>
+    </header>
+
+    <!-- Main layout: 3 columns -->
+    <main id="main-layout">
+      <!-- Left sidebar: Session/Project info -->
+      <aside id="sidebar" class="panel">
+        <div id="session-summary"></div>
+        <div id="track-list"></div>
+      </aside>
+
+      <!-- Center: Chat + Actions -->
+      <section id="center-panel">
+        <div id="chat-panel" class="panel">
+          <div id="chat-messages"></div>
+          <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Ask your engineer... e.g., 'set me up to record vocals'" autocomplete="off">
+            <button id="chat-send">Send</button>
+          </div>
+        </div>
+        <div id="action-cards-area"></div>
+      </section>
+
+      <!-- Right sidebar: Selected track + Quick actions + Action log -->
+      <aside id="right-panel">
+        <div id="selected-track-panel" class="panel"></div>
+        <div id="quick-actions-panel" class="panel"></div>
+        <div id="action-log-panel" class="panel"></div>
+      </aside>
+    </main>
+
+    <!-- Confirmation modal -->
+    <div id="confirm-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <h3 id="modal-title">Confirm Actions</h3>
+        <div id="modal-body"></div>
+        <div class="modal-actions">
+          <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+          <button id="modal-confirm" class="btn btn-primary">Execute</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS modules -->
+  <script src="modules/state.js"></script>
+  <script src="modules/api.js"></script>
+  <script src="modules/websocket.js"></script>
+  <script src="components/connectionStatus.js"></script>
+  <script src="components/sidebar.js"></script>
+  <script src="components/trackPanel.js"></script>
+  <script src="components/chat.js"></script>
+  <script src="components/quickActions.js"></script>
+  <script src="components/actionCards.js"></script>
+  <script src="components/confirmModal.js"></script>
+  <script src="components/actionLog.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
