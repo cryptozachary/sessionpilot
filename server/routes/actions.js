@@ -42,6 +42,8 @@ const DIRECT_ACTION_MAP = {
       trackId: await resolveTrackId(bridge, args),
       color: args.color
     }),
+  selectTrack: async (bridge, args) =>
+    bridge.selectTrack({ trackId: await resolveTrackId(bridge, args) }),
   armTrack: async (bridge, args) =>
     bridge.armTrack({ trackId: await resolveTrackId(bridge, args) }),
   disarmTrack: async (bridge, args) =>

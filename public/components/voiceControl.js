@@ -4,6 +4,7 @@ window.SessionPilot.VoiceControl = (() => {
   const State = () => window.SessionPilot.State;
   const Chat = () => window.SessionPilot.Chat;
   const PendingActions = () => window.SessionPilot.PendingActions;
+  const VoiceRouter = () => window.SessionPilot.VoiceRouter;
 
   const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -110,37 +111,21 @@ window.SessionPilot.VoiceControl = (() => {
     return div.innerHTML;
   }
 
-  function normalizeText(text) {
-    return (text || '')
-      .toLowerCase()
-      .replace(/[.!?,]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  function isConfirmationPhrase(text) {
-    return /^(yes|yeah|yep|confirm|do it|go ahead|run it|execute|okay do it|proceed)$/.test(text);
-  }
-
-  function isCancelPhrase(text) {
-    return /^(no|nope|cancel|stop|never mind|dismiss|skip it|abort)$/.test(text);
-  }
-
   async function handlePendingVoiceCommand(transcript) {
     const pending = State().get('pendingActions');
     if (!pending || !pending.actions || pending.actions.length === 0) {
       return false;
     }
 
-    const normalized = normalizeText(transcript);
-    if (!normalized) return false;
+    const pendingReply = VoiceRouter().interpretPendingReply(transcript);
+    if (pendingReply === 'none') return false;
 
-    if (isCancelPhrase(normalized)) {
+    if (pendingReply === 'cancel') {
       PendingActions().cancel('Okay, cancelled.');
       return true;
     }
 
-    if (pending.requiresConfirmation && isConfirmationPhrase(normalized)) {
+    if (pending.requiresConfirmation && pendingReply === 'confirm') {
       try {
         await PendingActions().execute(pending, {
           label: (pending.context && (pending.context.workflow || pending.context.actionType)) || 'Voice confirmation'
@@ -152,7 +137,7 @@ window.SessionPilot.VoiceControl = (() => {
       return true;
     }
 
-    if (!pending.requiresConfirmation && /^(yes|do it|execute|run it|go ahead)$/.test(normalized)) {
+    if (!pending.requiresConfirmation && pendingReply === 'confirm') {
       try {
         await PendingActions().execute(pending, {
           label: (pending.context && (pending.context.workflow || pending.context.actionType)) || 'Voice execution'
@@ -243,6 +228,42 @@ window.SessionPilot.VoiceControl = (() => {
     setVoiceState({ transcript, error: '' });
 
     if (await handlePendingVoiceCommand(transcript)) {
+      setVoiceState({ transcript: '' });
+      return;
+    }
+
+    const routed = await VoiceRouter().route(transcript);
+    if (routed.kind === 'ignore') {
+      setVoiceState({ transcript: '' });
+      return;
+    }
+
+    if (routed.kind === 'handled') {
+      if (routed.reply) {
+        State().addChatMessage('assistant', routed.reply);
+      }
+      setVoiceState({ transcript: '' });
+      return;
+    }
+
+    if ((routed.kind === 'execute' || routed.kind === 'pending') && routed.pending) {
+      if (routed.kind === 'execute') {
+        try {
+          await PendingActions().execute(routed.pending, {
+            label: (routed.pending.context && (routed.pending.context.workflow || routed.pending.context.actionType)) || 'Voice command',
+            successMessage: routed.successMessage
+          });
+        } catch (error) {
+          console.error('Routed voice command failed:', error);
+          State().addChatMessage('assistant', 'I could not complete that command.');
+        }
+      } else {
+        if (routed.reply) {
+          State().addChatMessage('assistant', routed.reply);
+        }
+        State().set('pendingActions', routed.pending);
+      }
+
       setVoiceState({ transcript: '' });
       return;
     }

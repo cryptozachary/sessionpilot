@@ -71,7 +71,11 @@ window.SessionPilot.PendingActions = (() => {
     }
 
     if (result.ok !== false) {
-      const summary = (result.data && result.data.summary) || result.summary || 'Actions executed successfully.';
+      const summary =
+        options.successMessage ||
+        (result.data && result.data.summary) ||
+        result.summary ||
+        'Actions executed successfully.';
       State().addChatMessage('assistant', `Done! ${summary}`);
       State().addActionLogEntry({
         label,
@@ -79,7 +83,8 @@ window.SessionPilot.PendingActions = (() => {
         type: 'execution'
       });
     } else {
-      State().addChatMessage('assistant', `Something went wrong: ${result.error || 'Unknown error'}`);
+      const errorMessage = options.errorMessage || result.error || 'Unknown error';
+      State().addChatMessage('assistant', `Something went wrong: ${errorMessage}`);
       State().addActionLogEntry({
         label,
         status: 'failure',
