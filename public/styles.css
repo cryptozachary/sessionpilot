@@ -479,6 +479,116 @@ body {
 }
 
 /* Chat input area */
+#voice-control-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background: linear-gradient(180deg, rgba(15, 52, 96, 0.18), rgba(15, 52, 96, 0.04));
+}
+
+#voice-control-bar:empty {
+  display: none;
+}
+
+.voice-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.voice-strip.unsupported {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.voice-strip.active {
+  background: rgba(83, 215, 105, 0.04);
+}
+
+.voice-strip.live {
+  background: rgba(83, 215, 105, 0.07);
+}
+
+.voice-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.voice-toggle,
+.voice-speech-toggle {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.voice-toggle:hover,
+.voice-speech-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.voice-toggle.active {
+  background: rgba(83, 215, 105, 0.12);
+  border-color: rgba(83, 215, 105, 0.35);
+  color: var(--accent-green);
+}
+
+.voice-speech-toggle.active {
+  background: rgba(15, 52, 96, 0.45);
+  border-color: rgba(15, 52, 96, 0.7);
+  color: #c7dcff;
+}
+
+.voice-summary {
+  min-width: 0;
+}
+
+.voice-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.voice-caption {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.voice-dot.live {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px rgba(83, 215, 105, 0.45);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.voice-dot.speaking {
+  background: var(--accent-yellow);
+  box-shadow: 0 0 8px rgba(245, 200, 66, 0.4);
+}
+
 #chat-input-area {
   display: flex;
   gap: 8px;
@@ -1199,6 +1309,24 @@ body {
 
   #chat-input-area {
     padding: 8px;
+  }
+
+  .voice-strip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .voice-actions {
+    width: 100%;
+  }
+
+  .voice-toggle,
+  .voice-speech-toggle {
+    flex: 1;
+  }
+
+  .voice-caption {
+    white-space: normal;
   }
 
   #chat-input {

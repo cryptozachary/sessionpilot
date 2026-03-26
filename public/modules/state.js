@@ -6,6 +6,15 @@ window.SessionPilot.State = (() => {
     tracks: [],
     selectedTrack: null,
     connection: { connected: false, bridgeType: 'unknown' },
+    voice: {
+      supported: false,
+      enabled: false,
+      listening: false,
+      speaking: false,
+      transcript: '',
+      error: '',
+      speakReplies: true
+    },
     chatMessages: [],
     actionLog: [],
     pendingActions: [],

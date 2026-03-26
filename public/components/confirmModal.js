@@ -2,7 +2,7 @@ window.SessionPilot = window.SessionPilot || {};
 
 window.SessionPilot.ConfirmModal = (() => {
   const State = () => window.SessionPilot.State;
-  const API = () => window.SessionPilot.API;
+  const PendingActions = () => window.SessionPilot.PendingActions;
 
   let currentData = null;
 
@@ -57,7 +57,7 @@ window.SessionPilot.ConfirmModal = (() => {
 
   async function confirm() {
     const pending = currentData || State().get('pendingActions');
-    if (!pending || !pending.context) {
+    if (!pending) {
       hide();
       return;
     }
@@ -70,33 +70,9 @@ window.SessionPilot.ConfirmModal = (() => {
     }
 
     try {
-      const result = await API().executeAction({
-        workflow: pending.context.workflow,
-        args: pending.context.args,
-        confirmed: true
+      await PendingActions().execute(pending, {
+        label: (pending.context && (pending.context.workflow || pending.context.actionType)) || 'Confirmed execution'
       });
-
-      hide();
-
-      if (result.ok !== false) {
-        const summary = (result.data && result.data.summary) || result.summary || 'Actions executed successfully.';
-        State().addChatMessage('assistant', `Done! ${summary}`);
-        State().addActionLogEntry({
-          label: pending.context.workflow || 'Confirmed execution',
-          status: 'success',
-          type: 'execution'
-        });
-      } else {
-        State().addChatMessage('assistant', `Something went wrong: ${result.error || 'Unknown error'}`);
-        State().addActionLogEntry({
-          label: pending.context.workflow || 'Confirmed execution',
-          status: 'failure',
-          type: 'execution'
-        });
-      }
-
-      // Refresh state from server
-      window.SessionPilot.WS.refresh();
     } catch (e) {
       console.error('Confirm execute failed:', e);
       State().addChatMessage('assistant', 'Execution failed. Check server connection.');
@@ -157,5 +133,5 @@ window.SessionPilot.ConfirmModal = (() => {
     });
   }
 
-  return { init, show, hide };
+  return { init, show, hide, confirm };
 })();

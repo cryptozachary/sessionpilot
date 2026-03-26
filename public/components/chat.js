@@ -3,8 +3,11 @@ window.SessionPilot = window.SessionPilot || {};
 window.SessionPilot.Chat = (() => {
   const State = () => window.SessionPilot.State;
   const API = () => window.SessionPilot.API;
+  const PendingActions = () => window.SessionPilot.PendingActions;
 
   let isTyping = false;
+  let pendingRequestCount = 0;
+  let sendQueue = Promise.resolve();
 
   function renderMessages(messages) {
     const container = document.getElementById('chat-messages');
@@ -58,22 +61,42 @@ window.SessionPilot.Chat = (() => {
     return text;
   }
 
-  async function handleSend() {
-    const input = document.getElementById('chat-input');
-    const message = input.value.trim();
-    if (!message) return;
-
-    input.value = '';
-    input.focus();
-
-    State().addChatMessage('user', message);
-
-    isTyping = true;
+  function setTypingState(active) {
+    isTyping = active;
     renderMessages(State().get('chatMessages'));
+  }
+
+  function derivePendingContext(response, proposedActions) {
+    const context = response.context || (response.data && response.data.context) || {};
+    if (context.workflow || context.actionType) {
+      return context;
+    }
+
+    if (proposedActions.length === 1 && proposedActions[0].type) {
+      return {
+        actionType: proposedActions[0].type,
+        args: proposedActions[0].args || window.SessionPilot.PendingActions.extractActionArgs(proposedActions[0])
+      };
+    }
+
+    return context;
+  }
+
+  async function sendMessage(message, options = {}) {
+    const trimmed = (message || '').trim();
+    if (!trimmed) return null;
+
+    if (options.echoUser !== false) {
+      State().addChatMessage('user', trimmed, {
+        source: options.source || 'text'
+      });
+    }
+
+    pendingRequestCount += 1;
+    setTypingState(true);
 
     try {
-      const response = await API().sendChat(message);
-      isTyping = false;
+      const response = await API().sendChat(trimmed);
 
       if (response.ok !== false) {
         const assistantMsg = response.message || (response.data && response.data.message) || 'Done.';
@@ -83,29 +106,54 @@ window.SessionPilot.Chat = (() => {
           actions: proposedActions
         });
 
-        // If there are proposed actions, show action cards
         if (proposedActions.length > 0) {
-          const context = response.context || (response.data && response.data.context) || {};
           const requiresConfirmation = response.requiresConfirmation != null
             ? response.requiresConfirmation
             : (response.data && response.data.requiresConfirmation);
-
-          State().set('pendingActions', {
+          const pending = {
             actions: proposedActions,
-            context: context,
-            requiresConfirmation: requiresConfirmation
-          });
+            context: derivePendingContext(response, proposedActions),
+            requiresConfirmation
+          };
+
+          if (options.autoExecuteSafeActions && !requiresConfirmation) {
+            await PendingActions().execute(pending, {
+              label: (pending.context && (pending.context.workflow || pending.context.actionType)) || 'Voice command'
+            });
+          } else {
+            State().set('pendingActions', pending);
+          }
         }
       } else {
         State().addChatMessage('assistant', 'Sorry, something went wrong. Try again?');
       }
+
+      return response;
     } catch (e) {
-      isTyping = false;
       console.error('Chat send error:', e);
       State().addChatMessage('assistant', 'Connection issue. Is the server running?');
+      throw e;
+    } finally {
+      pendingRequestCount = Math.max(0, pendingRequestCount - 1);
+      setTypingState(pendingRequestCount > 0);
     }
+  }
 
-    renderMessages(State().get('chatMessages'));
+  function queueMessage(message, options = {}) {
+    sendQueue = sendQueue
+      .catch(() => null)
+      .then(() => sendMessage(message, options));
+    return sendQueue;
+  }
+
+  function handleSend() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    input.value = '';
+    input.focus();
+    queueMessage(message, { source: 'text' }).catch(() => null);
   }
 
   function init() {
@@ -134,5 +182,5 @@ window.SessionPilot.Chat = (() => {
     );
   }
 
-  return { init };
+  return { init, sendMessage: queueMessage };
 })();

@@ -2,7 +2,7 @@ window.SessionPilot = window.SessionPilot || {};
 
 window.SessionPilot.ActionCards = (() => {
   const State = () => window.SessionPilot.State;
-  const API = () => window.SessionPilot.API;
+  const PendingActions = () => window.SessionPilot.PendingActions;
 
   function render(pending) {
     const container = document.getElementById('action-cards-area');
@@ -77,7 +77,7 @@ window.SessionPilot.ActionCards = (() => {
   }
 
   async function executeAll(pending) {
-    if (!pending || !pending.context) return;
+    if (!pending) return;
 
     const executeBtn = document.getElementById('action-cards-execute');
     if (executeBtn) {
@@ -86,34 +86,9 @@ window.SessionPilot.ActionCards = (() => {
     }
 
     try {
-      const result = await API().executeAction({
-        workflow: pending.context.workflow,
-        args: pending.context.args,
-        confirmed: true
+      await PendingActions().execute(pending, {
+        label: (pending.context && (pending.context.workflow || pending.context.actionType)) || 'Batch execution'
       });
-
-      // Clear pending
-      State().set('pendingActions', []);
-
-      if (result.ok !== false) {
-        const summary = (result.data && result.data.summary) || result.summary || 'Actions executed successfully.';
-        State().addChatMessage('assistant', `Done! ${summary}`);
-        State().addActionLogEntry({
-          label: pending.context.workflow || 'Batch execution',
-          status: 'success',
-          type: 'execution'
-        });
-      } else {
-        State().addChatMessage('assistant', `Something went wrong: ${result.error || 'Unknown error'}`);
-        State().addActionLogEntry({
-          label: pending.context.workflow || 'Batch execution',
-          status: 'failure',
-          type: 'execution'
-        });
-      }
-
-      // Refresh state
-      window.SessionPilot.WS.refresh();
     } catch (e) {
       console.error('Execute all failed:', e);
       State().addChatMessage('assistant', 'Execution failed. Check server connection.');

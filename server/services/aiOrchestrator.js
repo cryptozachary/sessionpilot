@@ -229,7 +229,12 @@ async function handleDirectAction(bridge, matched, message) {
       const trackName = selected.data.name || 'Track ' + selected.data.index;
       return buildResponse(
         `I'll arm "${trackName}" for recording. You're good to go.`,
-        [{ type: 'armTrack', trackIndex: selected.data.index, label: `Arm "${trackName}"`, requiresConfirmation: false }],
+        [{
+          type: 'armTrack',
+          args: { trackIndex: selected.data.index },
+          label: `Arm "${trackName}"`,
+          requiresConfirmation: false
+        }],
         matched.actionType
       );
     }
@@ -242,7 +247,12 @@ async function handleDirectAction(bridge, matched, message) {
       const trackName = selected.data.name || 'Track ' + selected.data.index;
       return buildResponse(
         `I'll disarm "${trackName}" so it won't record.`,
-        [{ type: 'disarmTrack', trackIndex: selected.data.index, label: `Disarm "${trackName}"`, requiresConfirmation: false }],
+        [{
+          type: 'disarmTrack',
+          args: { trackIndex: selected.data.index },
+          label: `Disarm "${trackName}"`,
+          requiresConfirmation: false
+        }],
         matched.actionType
       );
     }
@@ -258,7 +268,12 @@ async function handleDirectAction(bridge, matched, message) {
       const oldName = selected.data.name || 'Track ' + selected.data.index;
       return buildResponse(
         `I'll rename "${oldName}" to "${args.name}".`,
-        [{ type: 'renameTrack', trackIndex: selected.data.index, name: args.name, label: `Rename "${oldName}" to "${args.name}"`, requiresConfirmation: false }],
+        [{
+          type: 'renameTrack',
+          args: { trackIndex: selected.data.index, name: args.name },
+          label: `Rename "${oldName}" to "${args.name}"`,
+          requiresConfirmation: false
+        }],
         matched.actionType
       );
     }
@@ -267,7 +282,12 @@ async function handleDirectAction(bridge, matched, message) {
       const trackName = args.name || 'New Track';
       return buildResponse(
         `I'll create a new track called "${trackName}".`,
-        [{ type: 'createTrack', name: trackName, label: `Create track "${trackName}"`, requiresConfirmation: false }],
+        [{
+          type: 'createTrack',
+          args: { name: trackName },
+          label: `Create track "${trackName}"`,
+          requiresConfirmation: false
+        }],
         matched.actionType
       );
     }
@@ -280,7 +300,12 @@ async function handleDirectAction(bridge, matched, message) {
       const trackName = selected.data.name || 'Track ' + selected.data.index;
       return buildResponse(
         `I'll duplicate "${trackName}" for you.`,
-        [{ type: 'duplicateTrack', trackIndex: selected.data.index, label: `Duplicate "${trackName}"`, requiresConfirmation: false }],
+        [{
+          type: 'duplicateTrack',
+          args: { trackIndex: selected.data.index },
+          label: `Duplicate "${trackName}"`,
+          requiresConfirmation: false
+        }],
         matched.actionType
       );
     }
@@ -289,7 +314,12 @@ async function handleDirectAction(bridge, matched, message) {
       const markerName = args.name || 'Marker';
       return buildResponse(
         `I'll drop a marker called "${markerName}" at the current cursor position.`,
-        [{ type: 'insertMarker', name: markerName, label: `Insert marker "${markerName}" at cursor`, requiresConfirmation: false }],
+        [{
+          type: 'insertMarker',
+          args: { name: markerName },
+          label: `Insert marker "${markerName}" at cursor`,
+          requiresConfirmation: false
+        }],
         matched.actionType
       );
     }
@@ -335,12 +365,21 @@ async function handleDirectAction(bridge, matched, message) {
  * Build a standardized AssistantResponse object.
  */
 function buildResponse(message, proposedActions, actionType, context) {
+  const normalizedContext = context ? { ...context } : {};
+  if (!normalizedContext.workflow && !normalizedContext.actionType && proposedActions && proposedActions.length === 1) {
+    const [firstAction] = proposedActions;
+    if (firstAction && firstAction.type) {
+      normalizedContext.actionType = firstAction.type;
+      normalizedContext.args = firstAction.args || {};
+    }
+  }
+
   return {
     message,
     proposedActions: proposedActions || [],
     requiresConfirmation: actionType === 'needs_confirmation' || (proposedActions || []).some(a => a.requiresConfirmation),
     actionType: actionType || 'advice',
-    context: context || {}
+    context: normalizedContext
   };
 }
 

@@ -15,7 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     QuickActions,
     ActionCards,
     ConfirmModal,
-    ActionLog
+    ActionLog,
+    VoiceControl
   } = window.SessionPilot;
 
   // Initialize all UI components
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ActionCards.init();
   ConfirmModal.init();
   ActionLog.init();
+  VoiceControl.init();
 
   // Connect WebSocket for real-time updates
   WS.connect();
