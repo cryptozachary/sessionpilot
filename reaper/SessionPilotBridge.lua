@@ -1090,6 +1090,110 @@ commands.loadFxChain = function(args)
 end
 
 ---------------------------------------------------------------------------
+-- Undo / Redo
+---------------------------------------------------------------------------
+commands.undo = function(args)
+  reaper.Undo_DoUndo2(0)
+  local nextUndo = reaper.Undo_CanUndo2(0)
+  return {
+    ok = true,
+    data = {
+      undone = true,
+      description = nextUndo and ("Next undo: " .. nextUndo) or "Nothing left to undo"
+    }
+  }
+end
+
+commands.redo = function(args)
+  reaper.Undo_DoRedo2(0)
+  local nextRedo = reaper.Undo_CanRedo2(0)
+  return {
+    ok = true,
+    data = {
+      redone = true,
+      description = nextRedo and ("Next redo: " .. nextRedo) or "Nothing left to redo"
+    }
+  }
+end
+
+---------------------------------------------------------------------------
+-- FX Management
+---------------------------------------------------------------------------
+commands.getTrackFx = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+  local fxCount = reaper.TrackFX_GetCount(track)
+  local fxList = {}
+  for i = 0, fxCount - 1 do
+    local _, fxName = reaper.TrackFX_GetFXName(track, i, "")
+    local enabled = reaper.TrackFX_GetEnabled(track, i)
+    local _, presetName = reaper.TrackFX_GetPreset(track, i, "")
+    fxList[#fxList + 1] = {
+      index = i,
+      name = fxName,
+      bypassed = not enabled,
+      presetName = presetName or ""
+    }
+  end
+  return { ok = true, data = { trackId = args.trackId, fx = fxList } }
+end
+
+commands.removeFx = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+  local fxIndex = args.fxIndex or 0
+  if fxIndex < 0 or fxIndex >= reaper.TrackFX_GetCount(track) then
+    return { ok = false, errors = {"FX index out of range"} }
+  end
+  local _, fxName = reaper.TrackFX_GetFXName(track, fxIndex, "")
+  reaper.TrackFX_Delete(track, fxIndex)
+  return { ok = true, data = { trackId = args.trackId, removedFx = fxName, fxIndex = fxIndex } }
+end
+
+commands.toggleFxBypass = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+  local fxIndex = args.fxIndex or 0
+  if fxIndex < 0 or fxIndex >= reaper.TrackFX_GetCount(track) then
+    return { ok = false, errors = {"FX index out of range"} }
+  end
+  local shouldEnable = not args.bypassed
+  reaper.TrackFX_SetEnabled(track, fxIndex, shouldEnable)
+  return { ok = true, data = { trackId = args.trackId, fxIndex = fxIndex, bypassed = args.bypassed } }
+end
+
+---------------------------------------------------------------------------
+-- Rendering
+---------------------------------------------------------------------------
+commands.renderProject = function(args)
+  -- Action 42230: File: Render project, using the most recent render settings
+  reaper.Main_OnCommand(42230, 0)
+  local projPath = reaper.GetProjectPath("")
+  return {
+    ok = true,
+    data = {
+      rendered = true,
+      outputPath = projPath,
+      note = "Render initiated using current render settings"
+    },
+    warnings = {"Render uses current project render settings. Check REAPER for completion."}
+  }
+end
+
+commands.renderStems = function(args)
+  -- Uses same render action; REAPER render settings must be configured for stems
+  reaper.Main_OnCommand(42230, 0)
+  return {
+    ok = true,
+    data = {
+      rendered = true,
+      note = "Stem render initiated. Configure REAPER render settings for stem export."
+    },
+    warnings = {"Stem rendering requires REAPER render settings configured for selected tracks as stems."}
+  }
+end
+
+---------------------------------------------------------------------------
 -- Write state snapshot
 ---------------------------------------------------------------------------
 local function writeStateSnapshot()

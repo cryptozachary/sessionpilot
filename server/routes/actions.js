@@ -93,7 +93,24 @@ const DIRECT_ACTION_MAP = {
     bridge.loadFxChain({
       trackId: await resolveTrackId(bridge, args),
       fxChainName: args.fxChainName || args.chainName
-    })
+    }),
+  undo: async (bridge) => bridge.undo(),
+  redo: async (bridge) => bridge.redo(),
+  getTrackFx: async (bridge, args) =>
+    bridge.getTrackFx({ trackId: await resolveTrackId(bridge, args) }),
+  removeFx: async (bridge, args) =>
+    bridge.removeFx({
+      trackId: await resolveTrackId(bridge, args),
+      fxIndex: args.fxIndex
+    }),
+  toggleFxBypass: async (bridge, args) =>
+    bridge.toggleFxBypass({
+      trackId: await resolveTrackId(bridge, args),
+      fxIndex: args.fxIndex,
+      bypassed: args.bypassed !== false
+    }),
+  renderProject: async (bridge, args) => bridge.renderProject(args),
+  renderStems: async (bridge, args) => bridge.renderStems(args)
 };
 
 module.exports = function createActionRoutes(bridge) {

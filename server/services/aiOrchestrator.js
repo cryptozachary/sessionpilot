@@ -53,7 +53,7 @@ const INTENT_PATTERNS = [
 
   // Comp takes
   {
-    patterns: [/comp/i, /best\s*take/i, /pick.*take/i, /choose.*take/i, /review.*take/i, /which\s*take/i, /takes?\s*(on|for)/i, /show.*takes?/i],
+    patterns: [/\bcomp\b/i, /comp.*take/i, /best\s*take/i, /pick.*take/i, /choose.*take/i, /review.*take/i, /which\s*take/i, /takes?\s*(on|for)/i, /show.*takes?/i],
     intent: 'comp_takes', workflow: 'compTakes', actionType: 'safe_action'
   },
 
@@ -80,6 +80,28 @@ const INTENT_PATTERNS = [
     patterns: [/pre-?flight/i, /ready\s*to\s*record/i, /check.*setup/i, /everything\s*(good|ready|set)/i, /session\s*check/i, /before\s*(we|I)\s*record/i, /am\s*I\s*good/i],
     intent: 'preflight_check', workflow: 'preflightCheck', actionType: 'advice'
   },
+
+  // FX chain management
+  {
+    patterns: [/fx\s*chain/i, /plug-?ins?/i, /effect/i, /add.*(?:comp|eq|reverb|delay)/i, /remove.*fx/i, /bypass.*fx/i, /show.*fx/i, /what.*fx/i, /manage.*fx/i],
+    intent: 'manage_fx_chain', workflow: 'manageFxChain', actionType: 'needs_confirmation'
+  },
+
+  // Batch recording
+  {
+    patterns: [/batch\s*record/i, /multiple\s*songs?/i, /playlist\s*record/i, /song\s*list/i, /set\s*up\s*songs/i, /recording\s*session.*songs/i],
+    intent: 'batch_recording', workflow: 'batchRecording', actionType: 'needs_confirmation'
+  },
+
+  // Export / bounce
+  {
+    patterns: [/\bexport\b/i, /\bbounce\b/i, /\brender\b/i, /mix\s*down/i, /\bstems?\b/i, /final\s*mix/i, /print.*mix/i],
+    intent: 'export_bounce', workflow: 'exportBounce', actionType: 'needs_confirmation'
+  },
+
+  // Undo / redo
+  { patterns: [/\bundo\b/i, /take\s*(that|it)\s*back/i, /reverse\s*(that|last)/i], intent: 'undo', actionType: 'safe_action' },
+  { patterns: [/\bredo\b/i, /redo\s*(that|last)/i], intent: 'redo', actionType: 'safe_action' },
 
   // Simple track actions
   { patterns: [/arm\s*(the\s*)?track/i, /arm\s*it/i], intent: 'arm_track', actionType: 'safe_action' },
@@ -210,7 +232,27 @@ function extractArgs(message, intent) {
     case 'rough_mix':
     case 'setup_headphone_mix':
     case 'preflight_check':
+    case 'manage_fx_chain':
+    case 'undo':
+    case 'redo':
       return {};
+
+    case 'batch_recording': {
+      const songMatch = message.match(/songs?[:\s]+(.+)/i);
+      if (songMatch) {
+        const songNames = songMatch[1].split(/,\s*/).map(s => s.trim().replace(/^["']|["']$/g, ''));
+        return { songs: songNames.filter(Boolean).map(name => ({ name })) };
+      }
+      return {};
+    }
+
+    case 'export_bounce': {
+      const a = {};
+      if (/stems?\b/i.test(message)) a.mode = 'stems';
+      else if (/all|everything/i.test(message)) a.mode = 'all';
+      else a.mode = 'mix';
+      return a;
+    }
 
     default:
       return {};
@@ -335,6 +377,34 @@ async function handleDirectAction(bridge, matched, message) {
           type: 'insertMarker',
           args: { name: markerName },
           label: `Insert marker "${markerName}" at cursor`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'undo': {
+      return buildResponse(
+        "I'll undo the last action in REAPER.",
+        [{
+          type: 'undo',
+          args: {},
+          label: 'Undo last action',
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'redo': {
+      return buildResponse(
+        "I'll redo the last undone action.",
+        [{
+          type: 'redo',
+          args: {},
+          label: 'Redo last action',
           requiresConfirmation: false
         }],
         matched.actionType,

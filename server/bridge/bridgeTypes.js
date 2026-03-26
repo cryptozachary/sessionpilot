@@ -44,7 +44,10 @@ const WORKFLOW_NAMES = {
   MARK_SONG_STRUCTURE: 'markSongStructure',
   SESSION_NOTES: 'sessionNotes',
   PREFLIGHT_CHECK: 'preflightCheck',
-  QUICK_PUNCH_LOOP: 'quickPunchLoop'
+  QUICK_PUNCH_LOOP: 'quickPunchLoop',
+  MANAGE_FX_CHAIN: 'manageFxChain',
+  BATCH_RECORDING: 'batchRecording',
+  EXPORT_BOUNCE: 'exportBounce'
 };
 
 /**
@@ -92,6 +95,19 @@ const CONFIRMATION_POLICY = {
 
   // Loop / time selection
   setLoopPoints: RISK_LEVELS.LOW,
+
+  // Undo / redo
+  undo: RISK_LEVELS.LOW,
+  redo: RISK_LEVELS.LOW,
+
+  // FX management
+  getTrackFx: RISK_LEVELS.LOW,
+  removeFx: RISK_LEVELS.MEDIUM,
+  toggleFxBypass: RISK_LEVELS.LOW,
+
+  // Rendering
+  renderProject: RISK_LEVELS.HIGH,
+  renderStems: RISK_LEVELS.HIGH,
 
   // Workflow operations - high risk, always require confirmation
   executeWorkflow: RISK_LEVELS.HIGH,

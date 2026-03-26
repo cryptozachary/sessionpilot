@@ -462,6 +462,46 @@ class ReaperBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // Undo / Redo
+  // ---------------------------------------------------------------------------
+
+  async undo() {
+    throw new Error('Not implemented: undo');
+  }
+
+  async redo() {
+    throw new Error('Not implemented: redo');
+  }
+
+  // ---------------------------------------------------------------------------
+  // FX Management
+  // ---------------------------------------------------------------------------
+
+  async getTrackFx({ trackId }) {
+    throw new Error('Not implemented: getTrackFx');
+  }
+
+  async removeFx({ trackId, fxIndex }) {
+    throw new Error('Not implemented: removeFx');
+  }
+
+  async toggleFxBypass({ trackId, fxIndex, bypassed }) {
+    throw new Error('Not implemented: toggleFxBypass');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------------
+
+  async renderProject({ outputPath, format, sampleRate, bitDepth, tail } = {}) {
+    throw new Error('Not implemented: renderProject');
+  }
+
+  async renderStems({ outputPath, format, sampleRate, bitDepth, stemTracks } = {}) {
+    throw new Error('Not implemented: renderStems');
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 

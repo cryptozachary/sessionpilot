@@ -12,7 +12,10 @@ const workflows = {
   markSongStructure: require('./markSongStructure'),
   sessionNotes: require('./sessionNotes'),
   preflightCheck: require('./preflightCheck'),
-  quickPunchLoop: require('./quickPunchLoop')
+  quickPunchLoop: require('./quickPunchLoop'),
+  manageFxChain: require('./manageFxChain'),
+  batchRecording: require('./batchRecording'),
+  exportBounce: require('./exportBounce')
 };
 
 module.exports = {

@@ -105,6 +105,36 @@ window.SessionPilot.QuickActions = (() => {
       needsConfirm: false,
       icon: '\u{1F501}',
       promptForArgs: true
+    },
+    // --- New workflows ---
+    {
+      label: 'FX Chain',
+      workflow: 'manageFxChain',
+      args: {},
+      needsConfirm: true,
+      icon: '\u{1F50C}'
+    },
+    {
+      label: 'Batch Record',
+      workflow: 'batchRecording',
+      args: {},
+      needsConfirm: false,
+      icon: '\u{1F4DD}',
+      promptForArgs: true
+    },
+    {
+      label: 'Export',
+      workflow: 'exportBounce',
+      args: { mode: 'mix' },
+      needsConfirm: true,
+      icon: '\u{1F4E4}'
+    },
+    {
+      label: 'Undo',
+      actionType: 'undo',
+      args: {},
+      needsConfirm: false,
+      icon: '\u21A9'
     }
   ];
 

@@ -551,6 +551,46 @@ class JsonQueueReaperBridge extends ReaperBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // FX Management
+  // ---------------------------------------------------------------------------
+
+  async getTrackFx({ trackId }) {
+    return this._sendCommand('getTrackFx', { trackId });
+  }
+
+  async removeFx({ trackId, fxIndex }) {
+    return this._sendCommand('removeFx', { trackId, fxIndex });
+  }
+
+  async toggleFxBypass({ trackId, fxIndex, bypassed }) {
+    return this._sendCommand('toggleFxBypass', { trackId, fxIndex, bypassed });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Undo / Redo
+  // ---------------------------------------------------------------------------
+
+  async undo() {
+    return this._sendCommand('undo');
+  }
+
+  async redo() {
+    return this._sendCommand('redo');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------------
+
+  async renderProject(args = {}) {
+    return this._sendCommand('renderProject', args);
+  }
+
+  async renderStems(args = {}) {
+    return this._sendCommand('renderStems', args);
+  }
+
+  // ---------------------------------------------------------------------------
   // Workflows
   // ---------------------------------------------------------------------------
 

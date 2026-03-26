@@ -906,6 +906,102 @@ class MockReaperBridge extends ReaperBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // Undo / Redo
+  // ---------------------------------------------------------------------------
+
+  async undo() {
+    await this._simulateLatency();
+    return this._result(true, { undone: true, description: 'Undo: mock action reversed' }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  async redo() {
+    await this._simulateLatency();
+    return this._result(true, { redone: true, description: 'Redo: mock action restored' }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // FX Management
+  // ---------------------------------------------------------------------------
+
+  async getTrackFx({ trackId }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+    const fxList = (track.fxNames || []).map((name, i) => ({
+      index: i,
+      name,
+      bypassed: false,
+      presetName: 'Default'
+    }));
+    return this._result(true, { trackId, fx: fxList }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  async removeFx({ trackId, fxIndex }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+    if (!track.fxNames || fxIndex < 0 || fxIndex >= track.fxNames.length) {
+      return this._result(false, null, [], [`FX index ${fxIndex} out of range`], {
+        bridgeType: BRIDGE_TYPES.MOCK
+      });
+    }
+    const removed = track.fxNames.splice(fxIndex, 1)[0];
+    return this._result(true, { trackId, removedFx: removed, fxIndex }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  async toggleFxBypass({ trackId, fxIndex, bypassed }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+    return this._result(true, { trackId, fxIndex, bypassed: bypassed !== false }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------------
+
+  async renderProject({ outputPath, format, sampleRate, bitDepth } = {}) {
+    await this._simulateLatency(300, 800);
+    return this._result(true, {
+      rendered: true,
+      outputPath: outputPath || '/Projects/Renders/Mix.wav',
+      format: format || 'wav',
+      sampleRate: sampleRate || 48000,
+      bitDepth: bitDepth || 24,
+      durationSeconds: 210.5,
+      fileSizeMB: 62.3
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async renderStems({ outputPath, format, sampleRate, bitDepth, stemTracks } = {}) {
+    await this._simulateLatency(300, 800);
+    const trackNames = stemTracks || this._tracks.map(t => t.name);
+    const stems = trackNames.map(name => ({
+      trackName: name,
+      outputFile: `${outputPath || '/Projects/Stems'}/${name.replace(/\s+/g, '_')}.${format || 'wav'}`,
+      durationSeconds: 210.5
+    }));
+    return this._result(true, {
+      rendered: true,
+      stemCount: stems.length,
+      stems,
+      format: format || 'wav',
+      sampleRate: sampleRate || 48000,
+      bitDepth: bitDepth || 24
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  // ---------------------------------------------------------------------------
   // Workflows
   // ---------------------------------------------------------------------------
 

@@ -23,7 +23,14 @@ const DIRECT_ACTION_TYPES = new Set([
   'insertMarker',
   'createRegion',
   'loadTrackTemplate',
-  'loadFxChain'
+  'loadFxChain',
+  'undo',
+  'redo',
+  'getTrackFx',
+  'removeFx',
+  'toggleFxBypass',
+  'renderProject',
+  'renderStems'
 ]);
 
 const KNOWN_WORKFLOWS = new Set(listWorkflows().map((workflow) => workflow.name));

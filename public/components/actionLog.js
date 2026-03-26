@@ -12,16 +12,26 @@ window.SessionPilot.ActionLog = (() => {
 
     const entries = log || [];
 
+    const undoRedoBar = `
+      <div class="action-log-undo-bar">
+        <button class="action-log-undo-btn" title="Undo last action">Undo</button>
+        <button class="action-log-redo-btn" title="Redo last action">Redo</button>
+      </div>
+    `;
+
     if (entries.length === 0) {
       container.innerHTML = `
         <div class="panel-header">ACTION LOG</div>
+        ${undoRedoBar}
         <div class="action-log-empty">No actions yet</div>
       `;
+      bindUndoRedo(container);
       return;
     }
 
     container.innerHTML = `
       <div class="panel-header">ACTION LOG (${entries.length})</div>
+      ${undoRedoBar}
       <div class="action-log-list">
         ${entries.slice(0, 50).map(entry => {
           const statusIcon = entry.status === 'success' ? '\u2713' : '\u2717';
@@ -42,6 +52,44 @@ window.SessionPilot.ActionLog = (() => {
         }).join('')}
       </div>
     `;
+    bindUndoRedo(container);
+  }
+
+  function bindUndoRedo(container) {
+    const undoBtn = container.querySelector('.action-log-undo-btn');
+    const redoBtn = container.querySelector('.action-log-redo-btn');
+
+    if (undoBtn) {
+      undoBtn.addEventListener('click', async () => {
+        undoBtn.disabled = true;
+        try {
+          const result = await API().executeAction({ actionType: 'undo', args: {}, confirmed: true });
+          const desc = (result.data && result.data.description) || 'Undo performed';
+          State().addChatMessage('assistant', desc);
+          State().addActionLogEntry({ label: 'Undo', status: 'success', type: 'execution' });
+        } catch (e) {
+          State().addChatMessage('assistant', 'Undo failed.');
+        } finally {
+          undoBtn.disabled = false;
+        }
+      });
+    }
+
+    if (redoBtn) {
+      redoBtn.addEventListener('click', async () => {
+        redoBtn.disabled = true;
+        try {
+          const result = await API().executeAction({ actionType: 'redo', args: {}, confirmed: true });
+          const desc = (result.data && result.data.description) || 'Redo performed';
+          State().addChatMessage('assistant', desc);
+          State().addActionLogEntry({ label: 'Redo', status: 'success', type: 'execution' });
+        } catch (e) {
+          State().addChatMessage('assistant', 'Redo failed.');
+        } finally {
+          redoBtn.disabled = false;
+        }
+      });
+    }
   }
 
   function formatTimeAgo(timestamp) {

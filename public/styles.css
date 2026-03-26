@@ -1007,6 +1007,41 @@ body {
   font-size: 11px;
 }
 
+.action-log-undo-bar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.action-log-undo-btn,
+.action-log-redo-btn {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-light);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.action-log-undo-btn:hover,
+.action-log-redo-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.action-log-undo-btn:disabled,
+.action-log-redo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ----- Buttons ----- */
 .btn {
   padding: 8px 16px;
