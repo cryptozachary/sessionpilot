@@ -4,22 +4,94 @@
 const workflowService = require('../services/workflowService');
 const actionLog = require('../services/actionLog');
 
+async function resolveTrackId(bridge, args = {}) {
+  if (args.trackId) return args.trackId;
+  if (args.trackIndex !== undefined && args.trackIndex !== null) {
+    try {
+      const tracks = await bridge.listTracks();
+      const track = (tracks.data || []).find((item) => item.index === args.trackIndex);
+      if (track && track.id) return track.id;
+    } catch (err) {
+      // Fall back to the JSON queue bridge track ID convention.
+    }
+    return `track_${args.trackIndex}`;
+  }
+  if (args.target === 'selected') {
+    const selected = await bridge.getSelectedTrack();
+    return selected.data && selected.data.id;
+  }
+  return null;
+}
+
 // Map of direct action types to bridge method calls
 const DIRECT_ACTION_MAP = {
-  createTrack:        (bridge, args) => bridge.createTrack(args.name, args.type),
-  renameTrack:        (bridge, args) => bridge.renameTrack(args.trackIndex, args.name),
-  setTrackColor:      (bridge, args) => bridge.setTrackColor(args.trackIndex, args.color),
-  armTrack:           (bridge, args) => bridge.armTrack(args.trackIndex),
-  disarmTrack:        (bridge, args) => bridge.disarmTrack(args.trackIndex),
-  toggleMonitoring:   (bridge, args) => bridge.toggleMonitoring(args.trackIndex),
-  muteTrack:          (bridge, args) => bridge.muteTrack(args.trackIndex),
-  soloTrack:          (bridge, args) => bridge.soloTrack(args.trackIndex),
-  duplicateTrack:     (bridge, args) => bridge.duplicateTrack(args.trackIndex),
-  createFolderTrack:  (bridge, args) => bridge.createFolderTrack(args.name, args.childCount),
-  insertMarker:       (bridge, args) => bridge.insertMarker(args.name, args.position, args.color),
-  createRegion:       (bridge, args) => bridge.createRegion(args.name, args.start, args.end, args.color),
-  loadTrackTemplate:  (bridge, args) => bridge.loadTrackTemplate(args.templateName),
-  loadFxChain:        (bridge, args) => bridge.loadFxChain(args.trackIndex, args.chainName)
+  createTrack: async (bridge, args) =>
+    bridge.createTrack({
+      name: args.name,
+      color: args.color,
+      insertIndex: args.insertIndex,
+      parentTrackId: args.parentTrackId
+    }),
+  renameTrack: async (bridge, args) =>
+    bridge.renameTrack({
+      trackId: await resolveTrackId(bridge, args),
+      name: args.name
+    }),
+  setTrackColor: async (bridge, args) =>
+    bridge.setTrackColor({
+      trackId: await resolveTrackId(bridge, args),
+      color: args.color
+    }),
+  armTrack: async (bridge, args) =>
+    bridge.armTrack({ trackId: await resolveTrackId(bridge, args) }),
+  disarmTrack: async (bridge, args) =>
+    bridge.disarmTrack({ trackId: await resolveTrackId(bridge, args) }),
+  toggleMonitoring: async (bridge, args) =>
+    bridge.toggleMonitoring({
+      trackId: await resolveTrackId(bridge, args),
+      enabled: args.enabled !== false
+    }),
+  muteTrack: async (bridge, args) =>
+    bridge.muteTrack({
+      trackId: await resolveTrackId(bridge, args),
+      enabled: args.enabled !== false
+    }),
+  soloTrack: async (bridge, args) =>
+    bridge.soloTrack({
+      trackId: await resolveTrackId(bridge, args),
+      enabled: args.enabled !== false
+    }),
+  duplicateTrack: async (bridge, args) =>
+    bridge.duplicateTrack({
+      trackId: await resolveTrackId(bridge, args),
+      newName: args.newName
+    }),
+  createFolderTrack: async (bridge, args) =>
+    bridge.createFolderTrack({ name: args.name, color: args.color }),
+  insertMarker: async (bridge, args) =>
+    bridge.insertMarker({
+      name: args.name,
+      position: args.position,
+      bar: args.bar
+    }),
+  createRegion: async (bridge, args) =>
+    bridge.createRegion({
+      name: args.name,
+      start: args.start,
+      end: args.end,
+      startBar: args.startBar,
+      endBar: args.endBar
+    }),
+  loadTrackTemplate: async (bridge, args) =>
+    bridge.loadTrackTemplate({
+      trackId: await resolveTrackId(bridge, args),
+      templateName: args.templateName
+    }),
+  loadFxChain: async (bridge, args) =>
+    bridge.loadFxChain({
+      trackId: await resolveTrackId(bridge, args),
+      fxChainName: args.fxChainName || args.chainName
+    })
 };
 
 module.exports = function createActionRoutes(bridge) {
@@ -74,7 +146,7 @@ module.exports = function createActionRoutes(bridge) {
           broadcast('action_executed', { actionType, args, result });
         }
 
-        return res.json({ ok: true, data: result });
+        return res.json(result);
       }
 
       return res.json({ ok: false, error: 'Must provide either workflow or actionType' });

@@ -86,7 +86,7 @@ module.exports = {
 
     for (const track of tracks) {
       if (isFolderOrBus(track.name)) {
-        await bridge.setTrackColor(track.id, COLOR_MAP.folder);
+        await bridge.setTrackColor({ trackId: track.id, color: COLOR_MAP.folder });
         colored.push({ name: track.name, color: COLOR_MAP.folder });
         continue;
       }
@@ -95,7 +95,7 @@ module.exports = {
       if (!role) continue;
 
       const color = COLOR_MAP[role];
-      await bridge.setTrackColor(track.id, color);
+      await bridge.setTrackColor({ trackId: track.id, color });
       colored.push({ name: track.name, color });
     }
 

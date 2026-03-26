@@ -4,9 +4,19 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 
-// Bridge selection - use mock for now
+// Bridge selection - default to the real JSON queue bridge.
+const JsonQueueReaperBridge = require('./bridge/JsonQueueReaperBridge');
 const MockReaperBridge = require('./bridge/MockReaperBridge');
-const bridge = new MockReaperBridge();
+const bridgeRoot = process.env.REAPER_BRIDGE_DIR
+  ? path.resolve(process.env.REAPER_BRIDGE_DIR)
+  : path.join(__dirname, '..', 'reaper_bridge');
+const bridge = process.env.USE_MOCK_BRIDGE === '1'
+  ? new MockReaperBridge()
+  : new JsonQueueReaperBridge({
+      commandDir: path.join(bridgeRoot, 'commands'),
+      resultDir: path.join(bridgeRoot, 'results'),
+      stateFile: path.join(bridgeRoot, 'state.json')
+    });
 
 const app = express();
 const server = http.createServer(app);
@@ -35,4 +45,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`SessionPilot for REAPER running at http://localhost:${PORT}`);
   console.log(`Bridge: ${bridge.constructor.name}`);
+  if (bridge instanceof JsonQueueReaperBridge) {
+    console.log(`Bridge directory: ${bridgeRoot}`);
+  }
 });

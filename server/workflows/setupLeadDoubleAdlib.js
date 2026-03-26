@@ -65,16 +65,16 @@ module.exports = {
 
   async execute(bridge, args = {}) {
     const folderResult = await bridge.createFolderTrack({ name: 'Vocals', color: '#2ecc71' });
-    const folderId = folderResult.data;
+    const folderId = folderResult.data && folderResult.data.id;
 
-    const leadResult = await bridge.createTrack({ name: 'Lead Vocal', color: '#e74c3c', parent: folderId });
-    const leadId = leadResult.data;
-    await bridge.createTrack({ name: 'Double L', color: '#e67e22', parent: folderId });
-    await bridge.createTrack({ name: 'Double R', color: '#f39c12', parent: folderId });
-    await bridge.createTrack({ name: 'Adlibs', color: '#9b59b6', parent: folderId });
+    const leadResult = await bridge.createTrack({ name: 'Lead Vocal', color: '#e74c3c', parentTrackId: folderId });
+    const leadId = leadResult.data && leadResult.data.id;
+    await bridge.createTrack({ name: 'Double L', color: '#e67e22', parentTrackId: folderId });
+    await bridge.createTrack({ name: 'Double R', color: '#f39c12', parentTrackId: folderId });
+    await bridge.createTrack({ name: 'Adlibs', color: '#9b59b6', parentTrackId: folderId });
 
-    await bridge.armTrack(leadId);
-    await bridge.toggleMonitoring(leadId, true);
+    await bridge.armTrack({ trackId: leadId });
+    await bridge.toggleMonitoring({ trackId: leadId, enabled: true });
 
     return {
       workflow: 'setupLeadDoubleAdlib',

@@ -87,8 +87,8 @@ module.exports = {
     await bridge.insertMarker({ bar: startBar, name: 'Punch Start' });
     await bridge.insertMarker({ bar: endBar, name: 'Punch End' });
 
-    await bridge.armTrack(resolvedTrackId);
-    await bridge.toggleMonitoring(resolvedTrackId, true);
+    await bridge.armTrack({ trackId: resolvedTrackId });
+    await bridge.toggleMonitoring({ trackId: resolvedTrackId, enabled: true });
 
     return {
       workflow: 'preparePunchIn',

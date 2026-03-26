@@ -59,12 +59,12 @@ module.exports = {
 
   async execute(bridge, args = {}) {
     const trackResult = await bridge.createTrack({ name: 'Lead Vocal', color: '#e74c3c' });
-    const trackId = trackResult.data;
-    await bridge.armTrack(trackId);
-    await bridge.toggleMonitoring(trackId, true);
+    const trackId = trackResult.data && trackResult.data.id;
+    await bridge.armTrack({ trackId });
+    await bridge.toggleMonitoring({ trackId, enabled: true });
 
     if (args.loadTemplate) {
-      await bridge.loadTrackTemplate(trackId, 'Lead Vocal Starter');
+      await bridge.loadTrackTemplate({ trackId, templateName: 'Lead Vocal Starter' });
     }
 
     return {

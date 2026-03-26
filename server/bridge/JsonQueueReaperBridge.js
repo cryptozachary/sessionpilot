@@ -141,11 +141,65 @@ class JsonQueueReaperBridge extends ReaperBridge {
   async _readStateSnapshot() {
     try {
       const raw = await fs.readFile(this._stateFile, 'utf-8');
-      const state = JSON.parse(raw);
-      return state;
+      return this._normalizeStateSnapshot(JSON.parse(raw));
     } catch (err) {
       return null;
     }
+  }
+
+  /**
+   * Normalizes state snapshots from either the flat or nested Lua format.
+   * @param {Object} state
+   * @returns {Object|null}
+   */
+  _normalizeStateSnapshot(state) {
+    if (!state || typeof state !== 'object') return null;
+
+    const projectSummary = state.projectSummary || state;
+    const markersAndRegions = state.markersAndRegions || {};
+    const tracks = Array.isArray(state.tracks) ? state.tracks : [];
+    const markers = Array.isArray(state.markers)
+      ? state.markers
+      : Array.isArray(markersAndRegions.markers)
+        ? markersAndRegions.markers
+        : [];
+    const regions = Array.isArray(state.regions)
+      ? state.regions
+      : Array.isArray(markersAndRegions.regions)
+        ? markersAndRegions.regions
+        : [];
+    const selectedTrack =
+      state.selectedTrack !== undefined
+        ? state.selectedTrack
+        : tracks.find((track) => track && track.isSelected) || null;
+
+    return {
+      connected: state.connected !== undefined ? state.connected : true,
+      projectName: projectSummary.projectName || '',
+      projectPath: projectSummary.projectPath || '',
+      sampleRate: projectSummary.sampleRate || 44100,
+      bpm: projectSummary.bpm || 120,
+      transportState: projectSummary.transportState || state.transportState || 'stopped',
+      playCursor: projectSummary.playCursor || state.playCursor || 0,
+      recordMode: projectSummary.recordMode || state.recordMode || 'normal',
+      trackCount:
+        projectSummary.trackCount !== undefined
+          ? projectSummary.trackCount
+          : tracks.length,
+      markerCount:
+        projectSummary.markerCount !== undefined
+          ? projectSummary.markerCount
+          : markers.length,
+      regionCount:
+        projectSummary.regionCount !== undefined
+          ? projectSummary.regionCount
+          : regions.length,
+      tracks,
+      selectedTrack,
+      markers,
+      regions,
+      timestamp: state.timestamp || state.lastUpdated || null
+    };
   }
 
   /**
@@ -243,7 +297,7 @@ class JsonQueueReaperBridge extends ReaperBridge {
   async getSelectedTrack() {
     const state = await this._readStateSnapshot();
     if (state && this._isStateFresh(state) && state.tracks) {
-      const selected = state.tracks.find((t) => t.isSelected) || null;
+      const selected = state.selectedTrack || state.tracks.find((t) => t.isSelected) || null;
       return this._result(true, selected, [], [], {
         bridgeType: BRIDGE_TYPES.JSON_QUEUE
       });
@@ -333,7 +387,7 @@ class JsonQueueReaperBridge extends ReaperBridge {
   }
 
   async duplicateTrack({ trackId, newName }) {
-    return this._sendCommand('duplicateTrack', { trackId, newName });
+    return this._sendCommand('duplicateTrack', { trackId, name: newName });
   }
 
   async createFolderTrack({ name, color }) {
@@ -344,12 +398,128 @@ class JsonQueueReaperBridge extends ReaperBridge {
   // Markers
   // ---------------------------------------------------------------------------
 
-  async insertMarker({ position, name }) {
-    return this._sendCommand('insertMarker', { position, name });
+  async insertMarker({ position, name, bar }) {
+    return this._sendCommand('insertMarker', { position, name, bar });
   }
 
-  async createRegion({ start, end, name }) {
-    return this._sendCommand('createRegion', { start, end, name });
+  async createRegion({ start, end, name, startBar, endBar }) {
+    return this._sendCommand('createRegion', { start, end, name, startBar, endBar });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sends / Routing
+  // ---------------------------------------------------------------------------
+
+  async createSend(params = {}) {
+    return this._sendCommand('createSend', {
+      fromTrackId: params.fromTrackId || params.sourceTrackId,
+      toTrackId: params.toTrackId || params.destTrackId,
+      prePost: params.prePost,
+      volume: params.volume,
+      pan: params.pan
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Track Volume / Pan
+  // ---------------------------------------------------------------------------
+
+  async setTrackVolume({ trackId, volume }) {
+    return this._sendCommand('setTrackVolume', { trackId, volume });
+  }
+
+  async setTrackPan({ trackId, pan }) {
+    return this._sendCommand('setTrackPan', { trackId, pan });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Takes / Items
+  // ---------------------------------------------------------------------------
+
+  async listTakes({ trackId }) {
+    const result = await this._sendCommand('listTakes', { trackId });
+    if (!result.ok || !result.data || !Array.isArray(result.data.items)) {
+      return result;
+    }
+
+    const takes = [];
+    result.data.items.forEach((item) => {
+      (item.takes || []).forEach((take) => {
+        takes.push({
+          ...take,
+          itemIndex: item.itemIndex
+        });
+      });
+    });
+
+    result.data = {
+      ...result.data,
+      takes
+    };
+    return result;
+  }
+
+  async setActiveTake({ trackId, itemIndex = 0, takeIndex }) {
+    return this._sendCommand('setActiveTake', { trackId, itemIndex, takeIndex });
+  }
+
+  async splitItemAtCursor({ trackId, itemIndex = 0 }) {
+    return this._sendCommand('splitItemAtCursor', { trackId, itemIndex });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Loop / Time Selection
+  // ---------------------------------------------------------------------------
+
+  async setLoopPoints(params = {}) {
+    return this._sendCommand('setLoopPoints', {
+      start: params.start !== undefined ? params.start : params.startBar,
+      end: params.end !== undefined ? params.end : params.endBar,
+      enabled: params.enabled !== undefined ? params.enabled : true,
+      startBar: params.startBar,
+      endBar: params.endBar
+    });
+  }
+
+  async setTimeSelection(params = {}) {
+    return this._sendCommand('setTimeSelection', {
+      start: params.start !== undefined ? params.start : params.startBar,
+      end: params.end !== undefined ? params.end : params.endBar,
+      startBar: params.startBar,
+      endBar: params.endBar
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pre-Roll / Transport Helpers
+  // ---------------------------------------------------------------------------
+
+  async enablePreRoll({ enabled = true, beats }) {
+    return this._sendCommand('enablePreRoll', { enabled, beats });
+  }
+
+  // ---------------------------------------------------------------------------
+  // System / Info
+  // ---------------------------------------------------------------------------
+
+  async getBufferSize() {
+    return this._sendCommand('getBufferSize');
+  }
+
+  async getDiskSpace() {
+    return this._sendCommand('getDiskSpace');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Track Metadata
+  // ---------------------------------------------------------------------------
+
+  async addTrackNote({ trackId, note }) {
+    return this._sendCommand('addTrackNote', { trackId, note });
+  }
+
+  async setAutoFade({ trackId, enabled }) {
+    return this._sendCommand('setAutoFade', { trackId, enabled });
   }
 
   // ---------------------------------------------------------------------------

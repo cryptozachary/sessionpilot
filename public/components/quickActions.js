@@ -21,29 +21,29 @@ window.SessionPilot.QuickActions = (() => {
     },
     {
       label: 'Arm Selected',
-      workflow: 'armTrack',
+      actionType: 'armTrack',
       args: { target: 'selected' },
       needsConfirm: false,
       icon: '\u{1F534}'
     },
     {
       label: 'Monitor On',
-      workflow: 'setMonitoring',
+      actionType: 'toggleMonitoring',
       args: { target: 'selected', enabled: true },
       needsConfirm: false,
       icon: '\u{1F50A}'
     },
     {
       label: 'Monitor Off',
-      workflow: 'setMonitoring',
+      actionType: 'toggleMonitoring',
       args: { target: 'selected', enabled: false },
       needsConfirm: false,
       icon: '\u{1F507}'
     },
     {
       label: 'Add Marker',
-      workflow: 'insertMarker',
-      args: {},
+      actionType: 'insertMarker',
+      args: { name: 'Marker' },
       needsConfirm: false,
       icon: '\u{1F4CD}'
     },
@@ -180,11 +180,10 @@ window.SessionPilot.QuickActions = (() => {
     btn.textContent = '...';
 
     try {
-      const result = await API().executeAction({
-        workflow: action.workflow,
-        args: action.args,
-        confirmed: true
-      });
+      const payload = action.actionType
+        ? { actionType: action.actionType, args: action.args, confirmed: true }
+        : { workflow: action.workflow, args: action.args, confirmed: true };
+      const result = await API().executeAction(payload);
 
       if (result.ok !== false) {
         const summary = (result.data && result.data.summary) || result.summary || 'Done.';

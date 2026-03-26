@@ -8,7 +8,9 @@
 -- 3. Run the script — it will keep running in the background
 
 -- Configuration
-local BRIDGE_DIR = reaper.GetResourcePath() .. "/Scripts/SessionPilot/"
+local _, SCRIPT_PATH = reaper.get_action_context()
+local SCRIPT_DIR = SCRIPT_PATH:match("^(.*[\\/])") or (reaper.GetResourcePath() .. "/Scripts/")
+local BRIDGE_DIR = (SCRIPT_DIR .. "../reaper_bridge/"):gsub("\\", "/")
 local COMMAND_DIR = BRIDGE_DIR .. "commands/"
 local RESULT_DIR = BRIDGE_DIR .. "results/"
 local STATE_FILE = BRIDGE_DIR .. "state.json"
@@ -334,6 +336,16 @@ local function findTrackById(trackId)
 end
 
 ---------------------------------------------------------------------------
+-- Utility: convert a bar number into seconds using the project BPM
+---------------------------------------------------------------------------
+local function barToTime(bar)
+  if not bar then return nil end
+  local bpm, _ = reaper.GetProjectTimeSignature2(0)
+  if bpm == 0 then bpm = 120 end
+  return (bar - 1) * (4 * 60 / bpm)
+end
+
+---------------------------------------------------------------------------
 -- Get project summary
 ---------------------------------------------------------------------------
 local function getProjectSummary()
@@ -501,6 +513,19 @@ commands.getMarkersAndRegions = function(args)
   return { ok = true, data = getMarkersAndRegions() }
 end
 
+commands.getTransportState = function(args)
+  local summary = getProjectSummary()
+  return {
+    ok = true,
+    data = {
+      state = summary.transportState,
+      playCursor = summary.playCursor,
+      bpm = summary.bpm,
+      recordMode = summary.recordMode
+    }
+  }
+end
+
 commands.createTrack = function(args)
   local idx = args.insertIndex or reaper.CountTracks(0)
   reaper.InsertTrackAtIndex(idx, true)
@@ -605,8 +630,9 @@ commands.duplicateTrack = function(args)
   if not newTrack then
     return { ok = false, errors = {"Failed to duplicate track"} }
   end
-  if args.name then
-    reaper.GetSetMediaTrackInfo_String(newTrack, "P_NAME", args.name, true)
+  local newName = args.name or args.newName
+  if newName then
+    reaper.GetSetMediaTrackInfo_String(newTrack, "P_NAME", newName, true)
   end
   local newIdx = math.floor(reaper.GetMediaTrackInfo_Value(newTrack, "IP_TRACKNUMBER") - 1)
   return { ok = true, data = getTrackSummary(newTrack, newIdx) }
@@ -651,19 +677,33 @@ commands.createFolderTrack = function(args)
 end
 
 commands.insertMarker = function(args)
-  local pos = args.position or reaper.GetCursorPosition()
+  local pos = args.position
+  if pos == nil and args.bar ~= nil then
+    pos = barToTime(args.bar)
+  end
+  if pos == nil then
+    pos = reaper.GetCursorPosition()
+  end
   local idx = reaper.AddProjectMarker(0, false, pos, 0, args.name or "", -1)
   return { ok = true, data = { markerId = idx, position = pos, name = args.name } }
 end
 
 commands.createRegion = function(args)
-  local idx = reaper.AddProjectMarker(0, true, args.start, args["end"], args.name or "", -1)
+  local startPos = args.start
+  if startPos == nil and args.startBar ~= nil then
+    startPos = barToTime(args.startBar)
+  end
+  local endPos = args["end"]
+  if endPos == nil and args.endBar ~= nil then
+    endPos = barToTime(args.endBar)
+  end
+  local idx = reaper.AddProjectMarker(0, true, startPos, endPos, args.name or "", -1)
   return {
     ok = true,
     data = {
       regionId = idx,
-      start = args.start,
-      ["end"] = args["end"],
+      start = startPos,
+      ["end"] = endPos,
       name = args.name
     }
   }
@@ -813,8 +853,16 @@ commands.splitItemAtCursor = function(args)
 end
 
 commands.setLoopPoints = function(args)
-  local startPos = args.start or 0
-  local endPos = args["end"] or 0
+  local startPos = args.start
+  if startPos == nil and args.startBar ~= nil then
+    startPos = barToTime(args.startBar)
+  end
+  local endPos = args["end"]
+  if endPos == nil and args.endBar ~= nil then
+    endPos = barToTime(args.endBar)
+  end
+  startPos = startPos or 0
+  endPos = endPos or 0
   -- GetSet_LoopTimeRange(isSet, isLoop, start, end, allowAutoSeek)
   reaper.GetSet_LoopTimeRange(true, true, startPos, endPos, false)
   -- Enable or disable repeat/loop
@@ -834,8 +882,16 @@ commands.setLoopPoints = function(args)
 end
 
 commands.setTimeSelection = function(args)
-  local startPos = args.start or 0
-  local endPos = args["end"] or 0
+  local startPos = args.start
+  if startPos == nil and args.startBar ~= nil then
+    startPos = barToTime(args.startBar)
+  end
+  local endPos = args["end"]
+  if endPos == nil and args.endBar ~= nil then
+    endPos = barToTime(args.endBar)
+  end
+  startPos = startPos or 0
+  endPos = endPos or 0
   -- GetSet_LoopTimeRange(isSet, isLoop, start, end, allowAutoSeek)
   -- isLoop=false sets time selection rather than loop points
   reaper.GetSet_LoopTimeRange(true, false, startPos, endPos, false)
@@ -971,17 +1027,63 @@ commands.setAutoFade = function(args)
   }
 end
 
+commands.listAvailableTrackTemplates = function(args)
+  return {
+    ok = true,
+    data = {},
+    warnings = {"Track template discovery is not implemented in the Lua bridge yet"}
+  }
+end
+
+commands.loadTrackTemplate = function(args)
+  return {
+    ok = false,
+    errors = {"Track template loading is not implemented in the Lua bridge yet"}
+  }
+end
+
+commands.listAvailableFxChains = function(args)
+  return {
+    ok = true,
+    data = {},
+    warnings = {"FX chain discovery is not implemented in the Lua bridge yet"}
+  }
+end
+
+commands.loadFxChain = function(args)
+  return {
+    ok = false,
+    errors = {"FX chain loading is not implemented in the Lua bridge yet"}
+  }
+end
+
 ---------------------------------------------------------------------------
 -- Write state snapshot
 ---------------------------------------------------------------------------
 local function writeStateSnapshot()
+  local summary = getProjectSummary()
+  local markersAndRegions = getMarkersAndRegions()
+  local timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
   local state = {
     connected = true,
-    projectSummary = getProjectSummary(),
+    projectSummary = summary,
+    projectName = summary.projectName,
+    projectPath = summary.projectPath,
+    sampleRate = summary.sampleRate,
+    bpm = summary.bpm,
+    transportState = summary.transportState,
+    playCursor = summary.playCursor,
+    recordMode = summary.recordMode,
+    trackCount = summary.trackCount,
+    markerCount = summary.markerCount,
+    regionCount = summary.regionCount,
     tracks = listTracks(),
     selectedTrack = getSelectedTrack(),
-    markersAndRegions = getMarkersAndRegions(),
-    lastUpdated = os.date("!%Y-%m-%dT%H:%M:%SZ")
+    markersAndRegions = markersAndRegions,
+    markers = markersAndRegions.markers,
+    regions = markersAndRegions.regions,
+    timestamp = timestamp,
+    lastUpdated = timestamp
   }
   writeFile(STATE_FILE, jsonEncode(state))
 end

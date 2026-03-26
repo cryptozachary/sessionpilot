@@ -116,7 +116,7 @@ module.exports = {
 
     // Arm the track
     try {
-      await bridge.armTrack(resolvedTrackId);
+      await bridge.armTrack({ trackId: resolvedTrackId });
       executedActions.push({ action: 'armTrack', trackId: resolvedTrackId });
     } catch (err) {
       executedActions.push({ action: 'armTrack', note: 'Failed: ' + err.message });
@@ -124,7 +124,7 @@ module.exports = {
 
     // Enable monitoring
     try {
-      await bridge.toggleMonitoring(resolvedTrackId, true);
+      await bridge.toggleMonitoring({ trackId: resolvedTrackId, enabled: true });
       executedActions.push({ action: 'toggleMonitoring', trackId: resolvedTrackId, enabled: true });
     } catch (err) {
       executedActions.push({ action: 'toggleMonitoring', note: 'Failed: ' + err.message });
@@ -132,7 +132,7 @@ module.exports = {
 
     // Enable auto-crossfade
     try {
-      await bridge.setAutoFade(resolvedTrackId, true);
+      await bridge.setAutoFade({ trackId: resolvedTrackId, enabled: true });
       executedActions.push({ action: 'setAutoFade', trackId: resolvedTrackId, enabled: true });
     } catch (err) {
       executedActions.push({ action: 'setAutoFade', note: 'Failed: ' + err.message });

@@ -67,12 +67,12 @@ module.exports = {
 
     // Create the Cue Mix bus track
     const cueBusResult = await bridge.createTrack({ name: 'Cue Mix', color: '#3498db' });
-    const cueBusId = cueBusResult.data;
+    const cueBusId = cueBusResult.data && cueBusResult.data.id;
     executedActions.push({ action: 'createTrack', trackId: cueBusId, name: 'Cue Mix' });
 
     // Load reverb FX on the cue bus
     try {
-      await bridge.loadFxChain(cueBusId, 'ReaVerbate');
+      await bridge.loadFxChain({ trackId: cueBusId, fxChainName: 'ReaVerbate' });
       executedActions.push({ action: 'loadFx', trackId: cueBusId, fxName: 'ReaVerbate' });
     } catch (err) {
       executedActions.push({ action: 'loadFx', trackId: cueBusId, fxName: 'ReaVerbate', note: 'Could not auto-load FX — add ReaVerbate manually to the Cue Mix bus' });
@@ -83,7 +83,7 @@ module.exports = {
     const sourceTrackId = args.trackId || (selectedTrackResult.data && selectedTrackResult.data.id);
 
     // Create the send from vocal track to cue bus
-    await bridge.createSend({ sourceTrackId, destTrackId: cueBusId, volume: 0.5 });
+    await bridge.createSend({ fromTrackId: sourceTrackId, toTrackId: cueBusId, volume: 0.5 });
     executedActions.push({ action: 'createSend', sourceTrackId, destTrackId: cueBusId, volume: 0.5 });
 
     return {

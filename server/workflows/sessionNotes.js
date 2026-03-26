@@ -55,9 +55,9 @@ module.exports = {
     let resolvedPosition = position;
     if (resolvedPosition === undefined || resolvedPosition === null) {
       try {
-        const cursorResult = await bridge.getCursorPosition();
-        const cursorInfo = cursorResult.data || {};
-        resolvedPosition = cursorInfo.position || 0;
+        const sessionResult = await bridge.getProjectSummary();
+        const session = sessionResult.data || {};
+        resolvedPosition = session.playCursor || 0;
       } catch (err) {
         resolvedPosition = 0;
       }
@@ -74,7 +74,7 @@ module.exports = {
     // Add track note if trackId provided
     if (trackId) {
       try {
-        await bridge.addTrackNote(trackId, note);
+        await bridge.addTrackNote({ trackId, note });
         executedActions.push({ action: 'addTrackNote', trackId, note });
       } catch (err) {
         executedActions.push({ action: 'addTrackNote', trackId, note: 'Failed: ' + err.message });

@@ -92,27 +92,27 @@ module.exports = {
     // Set lead vocal volume
     const leadVocal = findTrack('Lead Vocal');
     if (leadVocal) {
-      await bridge.setTrackVolume(leadVocal.id, 1.0);
+      await bridge.setTrackVolume({ trackId: leadVocal.id, volume: 1.0 });
       executedActions.push({ action: 'setTrackVolume', trackId: leadVocal.id, name: leadVocal.name, volume: 1.0 });
     }
 
     // Pan doubles
     const doubleL = findTrack('Double L');
     if (doubleL) {
-      await bridge.setTrackPan(doubleL.id, -0.6);
+      await bridge.setTrackPan({ trackId: doubleL.id, pan: -0.6 });
       executedActions.push({ action: 'setTrackPan', trackId: doubleL.id, name: doubleL.name, pan: -0.6 });
     }
 
     const doubleR = findTrack('Double R');
     if (doubleR) {
-      await bridge.setTrackPan(doubleR.id, 0.6);
+      await bridge.setTrackPan({ trackId: doubleR.id, pan: 0.6 });
       executedActions.push({ action: 'setTrackPan', trackId: doubleR.id, name: doubleR.name, pan: 0.6 });
     }
 
     // Set adlibs volume
     const adlibs = findTrack('Adlib');
     if (adlibs) {
-      await bridge.setTrackVolume(adlibs.id, 0.7);
+      await bridge.setTrackVolume({ trackId: adlibs.id, volume: 0.7 });
       executedActions.push({ action: 'setTrackVolume', trackId: adlibs.id, name: adlibs.name, volume: 0.7 });
     }
 
@@ -120,7 +120,7 @@ module.exports = {
     let vocalBus = findTrack('Vocal Bus');
     if (!vocalBus) {
       const vocalBusResult = await bridge.createTrack({ name: 'Vocal Bus', color: '#9b59b6' });
-      const vocalBusId = vocalBusResult.data;
+      const vocalBusId = vocalBusResult.data && vocalBusResult.data.id;
       executedActions.push({ action: 'createTrack', trackId: vocalBusId, name: 'Vocal Bus' });
       vocalBus = { id: vocalBusId, name: 'Vocal Bus' };
     } else {
@@ -131,7 +131,7 @@ module.exports = {
     const vocalTracks = [leadVocal, doubleL, doubleR, adlibs].filter(Boolean);
     for (const vt of vocalTracks) {
       try {
-        await bridge.createSend({ sourceTrackId: vt.id, destTrackId: vocalBus.id });
+        await bridge.createSend({ fromTrackId: vt.id, toTrackId: vocalBus.id });
         executedActions.push({ action: 'createSend', sourceTrackId: vt.id, destTrackId: vocalBus.id });
       } catch (err) {
         executedActions.push({ action: 'createSend', sourceTrackId: vt.id, destTrackId: vocalBus.id, note: 'Failed: ' + err.message });

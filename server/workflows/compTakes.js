@@ -105,7 +105,7 @@ module.exports = {
     });
 
     // Identify current active take
-    const activeTake = takes.find(t => t.active);
+    const activeTake = takes.find(t => t.active || t.isActive);
     executedActions.push({
       action: 'identifyActiveTake',
       activeTake: activeTake ? activeTake.name : 'Unknown'
@@ -114,7 +114,7 @@ module.exports = {
     // Set active take if requested
     if (args.activeTakeIndex !== undefined && args.activeTakeIndex !== null) {
       try {
-        await bridge.setActiveTake(trackId, args.activeTakeIndex);
+        await bridge.setActiveTake({ trackId, itemIndex: args.itemIndex || 0, takeIndex: args.activeTakeIndex });
         executedActions.push({
           action: 'setActiveTake',
           trackId,
