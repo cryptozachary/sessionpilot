@@ -32,7 +32,7 @@ window.SessionPilot.API = (() => {
     getActionLog: (limit = 50) => request('GET', `/api/action-log?limit=${limit}`),
 
     // Chat
-    sendChat: (message) => request('POST', '/api/chat', { message }),
+    sendChat: (message, metadata = {}) => request('POST', '/api/chat', { message, ...metadata }),
 
     // Actions
     executeAction: (payload) => request('POST', '/api/actions/execute', payload),

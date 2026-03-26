@@ -96,7 +96,9 @@ window.SessionPilot.Chat = (() => {
     setTypingState(true);
 
     try {
-      const response = await API().sendChat(trimmed);
+      const response = await API().sendChat(trimmed, {
+        source: options.source || 'text'
+      });
 
       if (response.ok !== false) {
         const assistantMsg = response.message || (response.data && response.data.message) || 'Done.';

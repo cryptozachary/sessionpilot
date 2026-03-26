@@ -1,7 +1,10 @@
 // SessionPilot for REAPER - AI Orchestrator
-// Rule-based intent classifier (no cloud LLM required for MVP).
+// Rule-based intent classifier for deterministic session commands.
 
 const workflowService = require('./workflowService');
+
+const DEFAULT_FALLBACK_MESSAGE =
+  "I'm your recording engineer assistant. I can help set up vocal tracks, prepare punch-ins, diagnose monitoring issues, and organize your session. What do you need?";
 
 // Intent patterns - array of { patterns: RegExp[], intent, workflow?, actionType }
 const INTENT_PATTERNS = [
@@ -219,6 +222,10 @@ function extractArgs(message, intent) {
  */
 async function handleDirectAction(bridge, matched, message) {
   const args = extractArgs(message, matched.intent);
+  const baseContext = {
+    route: 'rule_based',
+    intent: matched.intent
+  };
 
   switch (matched.intent) {
     case 'arm_track': {
@@ -235,7 +242,8 @@ async function handleDirectAction(bridge, matched, message) {
           label: `Arm "${trackName}"`,
           requiresConfirmation: false
         }],
-        matched.actionType
+        matched.actionType,
+        baseContext
       );
     }
 
@@ -253,17 +261,23 @@ async function handleDirectAction(bridge, matched, message) {
           label: `Disarm "${trackName}"`,
           requiresConfirmation: false
         }],
-        matched.actionType
+        matched.actionType,
+        baseContext
       );
     }
 
     case 'rename_track': {
       const selected = await bridge.getSelectedTrack();
       if (!selected.ok || !selected.data) {
-        return buildResponse("Select the track you want to rename first.", [], 'advice');
+        return buildResponse("Select the track you want to rename first.", [], 'advice', baseContext);
       }
       if (!args.name) {
-        return buildResponse("What do you want to call it? Say something like \"rename track to Lead Vocal\".", [], 'advice');
+        return buildResponse(
+          "What do you want to call it? Say something like \"rename track to Lead Vocal\".",
+          [],
+          'advice',
+          baseContext
+        );
       }
       const oldName = selected.data.name || 'Track ' + selected.data.index;
       return buildResponse(
@@ -274,7 +288,8 @@ async function handleDirectAction(bridge, matched, message) {
           label: `Rename "${oldName}" to "${args.name}"`,
           requiresConfirmation: false
         }],
-        matched.actionType
+        matched.actionType,
+        baseContext
       );
     }
 
@@ -288,14 +303,15 @@ async function handleDirectAction(bridge, matched, message) {
           label: `Create track "${trackName}"`,
           requiresConfirmation: false
         }],
-        matched.actionType
+        matched.actionType,
+        baseContext
       );
     }
 
     case 'duplicate_track': {
       const selected = await bridge.getSelectedTrack();
       if (!selected.ok || !selected.data) {
-        return buildResponse("Select the track you want to duplicate first.", [], 'advice');
+        return buildResponse("Select the track you want to duplicate first.", [], 'advice', baseContext);
       }
       const trackName = selected.data.name || 'Track ' + selected.data.index;
       return buildResponse(
@@ -306,7 +322,8 @@ async function handleDirectAction(bridge, matched, message) {
           label: `Duplicate "${trackName}"`,
           requiresConfirmation: false
         }],
-        matched.actionType
+        matched.actionType,
+        baseContext
       );
     }
 
@@ -320,14 +337,15 @@ async function handleDirectAction(bridge, matched, message) {
           label: `Insert marker "${markerName}" at cursor`,
           requiresConfirmation: false
         }],
-        matched.actionType
+        matched.actionType,
+        baseContext
       );
     }
 
     case 'session_info': {
       const summary = await bridge.getProjectSummary();
       if (!summary.ok || !summary.data) {
-        return buildResponse("Couldn't pull up the session info. Is REAPER running?", [], 'advice');
+        return buildResponse("Couldn't pull up the session info. Is REAPER running?", [], 'advice', baseContext);
       }
       const s = summary.data;
       const lines = [
@@ -341,23 +359,20 @@ async function handleDirectAction(bridge, matched, message) {
         `Length: ${s.length || '?'}`,
         `File: ${s.filePath || 'Not saved yet'}`
       ];
-      return buildResponse(lines.join('\n'), [], 'advice');
+      return buildResponse(lines.join('\n'), [], 'advice', baseContext);
     }
 
     case 'greeting': {
       return buildResponse(
         "Hey! I'm your session engineer. I can set up vocal tracks, prepare punch-ins, troubleshoot monitoring, organize your session \u2014 you name it. What are we working on?",
         [],
-        'advice'
+        'advice',
+        baseContext
       );
     }
 
     default:
-      return buildResponse(
-        "I'm your recording engineer assistant. I can help set up vocal tracks, prepare punch-ins, diagnose monitoring issues, and organize your session. What do you need?",
-        [],
-        'advice'
-      );
+      return buildResponse(DEFAULT_FALLBACK_MESSAGE, [], 'advice', baseContext);
   }
 }
 
@@ -384,16 +399,25 @@ function buildResponse(message, proposedActions, actionType, context) {
 }
 
 module.exports = {
-  async processMessage(bridge, message) {
+  DEFAULT_FALLBACK_MESSAGE,
+  classifyIntent,
+  extractArgs,
+  buildResponse,
+
+  async processMessage(bridge, message, options = {}) {
     // 1. Classify intent
-    const matched = classifyIntent(message);
+    const matched = options.matchedIntent || classifyIntent(message);
 
     // 2. Generate response based on intent
     if (!matched) {
       return buildResponse(
-        "I'm your recording engineer assistant. I can help set up vocal tracks, prepare punch-ins, diagnose monitoring issues, and organize your session. What do you need?",
+        DEFAULT_FALLBACK_MESSAGE,
         [],
-        'advice'
+        'advice',
+        {
+          route: 'fallback',
+          intent: null
+        }
       );
     }
 
@@ -409,7 +433,14 @@ module.exports = {
         wfResult.summary,
         wfResult.proposedActions,
         matched.actionType,
-        { workflow: matched.workflow, args, checklist: wfResult.checklist, expectedOutcome: wfResult.expectedOutcome }
+        {
+          route: 'rule_based',
+          intent: matched.intent,
+          workflow: matched.workflow,
+          args,
+          checklist: wfResult.checklist,
+          expectedOutcome: wfResult.expectedOutcome
+        }
       );
     }
 
