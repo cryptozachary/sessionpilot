@@ -727,6 +727,80 @@ class MockReaperBridge extends ReaperBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // Transport Controls
+  // ---------------------------------------------------------------------------
+
+  async play() {
+    await this._simulateLatency();
+    this._transportState = 'playing';
+    return this._result(true, {
+      state: this._transportState,
+      playCursor: this._playCursor
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async stop() {
+    await this._simulateLatency();
+    this._transportState = 'stopped';
+    return this._result(true, {
+      state: this._transportState,
+      playCursor: this._playCursor
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async pause() {
+    await this._simulateLatency();
+    this._transportState = 'paused';
+    return this._result(true, {
+      state: this._transportState,
+      playCursor: this._playCursor
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async record() {
+    await this._simulateLatency();
+    this._transportState = 'recording';
+    return this._result(true, {
+      state: this._transportState,
+      playCursor: this._playCursor,
+      recordMode: this._recordMode
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async goToPosition({ position, bar } = {}) {
+    await this._simulateLatency();
+    if (bar !== undefined) {
+      // Convert bar to seconds: (bar * 4 beats) / bpm * 60
+      this._playCursor = ((bar - 1) * 4 / this._bpm) * 60;
+    } else if (position !== undefined) {
+      this._playCursor = position;
+    }
+    return this._result(true, {
+      playCursor: this._playCursor,
+      bar: bar || null
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async goToStart() {
+    await this._simulateLatency();
+    this._playCursor = 0;
+    return this._result(true, {
+      playCursor: 0,
+      description: 'Cursor moved to project start'
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async goToEnd() {
+    await this._simulateLatency();
+    // Mock end position
+    this._playCursor = 210.5;
+    return this._result(true, {
+      playCursor: this._playCursor,
+      description: 'Cursor moved to project end'
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  // ---------------------------------------------------------------------------
   // Pre-Roll / Transport Helpers
   // ---------------------------------------------------------------------------
 

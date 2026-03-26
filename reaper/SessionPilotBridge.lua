@@ -1090,6 +1090,119 @@ commands.loadFxChain = function(args)
 end
 
 ---------------------------------------------------------------------------
+-- Transport Controls
+---------------------------------------------------------------------------
+commands.play = function(args)
+  -- Action 1007: Transport: Play
+  reaper.Main_OnCommand(1007, 0)
+  local playState = reaper.GetPlayState()
+  local cursor = reaper.GetPlayPosition()
+  return {
+    ok = true,
+    data = {
+      state = "playing",
+      playCursor = cursor,
+      description = "Playback started"
+    }
+  }
+end
+
+commands.stop = function(args)
+  -- Action 1016: Transport: Stop
+  reaper.Main_OnCommand(1016, 0)
+  local cursor = reaper.GetCursorPosition()
+  return {
+    ok = true,
+    data = {
+      state = "stopped",
+      playCursor = cursor,
+      description = "Playback stopped"
+    }
+  }
+end
+
+commands.pause = function(args)
+  -- Action 1008: Transport: Pause
+  reaper.Main_OnCommand(1008, 0)
+  local playState = reaper.GetPlayState()
+  local state = "paused"
+  if playState == 1 then state = "playing"
+  elseif playState == 0 then state = "stopped"
+  end
+  local cursor = reaper.GetPlayPosition()
+  return {
+    ok = true,
+    data = {
+      state = state,
+      playCursor = cursor,
+      description = "Transport pause toggled"
+    }
+  }
+end
+
+commands.record = function(args)
+  -- Action 1013: Transport: Record
+  reaper.Main_OnCommand(1013, 0)
+  local playState = reaper.GetPlayState()
+  local cursor = reaper.GetPlayPosition()
+  local state = "recording"
+  if playState ~= 5 and playState ~= 6 then
+    state = "playing"  -- may not have armed tracks
+  end
+  return {
+    ok = true,
+    data = {
+      state = state,
+      playCursor = cursor,
+      description = "Recording started"
+    },
+    warnings = playState ~= 5 and {"No armed tracks — check that at least one track is armed for recording"} or {}
+  }
+end
+
+commands.goToPosition = function(args)
+  local pos = args.position
+  if pos == nil and args.bar ~= nil then
+    pos = barToTime(args.bar)
+  end
+  pos = pos or 0
+  reaper.SetEditCurPos(pos, true, false)
+  return {
+    ok = true,
+    data = {
+      playCursor = pos,
+      bar = args.bar,
+      description = args.bar and ("Cursor moved to bar " .. args.bar) or ("Cursor moved to " .. string.format("%.2f", pos) .. "s")
+    }
+  }
+end
+
+commands.goToStart = function(args)
+  -- Action 40042: Transport: Go to start of project
+  reaper.Main_OnCommand(40042, 0)
+  return {
+    ok = true,
+    data = {
+      playCursor = 0,
+      description = "Cursor moved to project start"
+    }
+  }
+end
+
+commands.goToEnd = function(args)
+  -- Action 40043: Transport: Go to end of project
+  reaper.Main_OnCommand(40043, 0)
+  local cursor = reaper.GetCursorPosition()
+  return {
+    ok = true,
+    data = {
+      playCursor = cursor,
+      description = "Cursor moved to project end"
+    }
+  }
+end
+
+---------------------------------------------------------------------------
 -- Undo / Redo
 ---------------------------------------------------------------------------
 commands.undo = function(args)

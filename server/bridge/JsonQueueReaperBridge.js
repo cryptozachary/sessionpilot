@@ -499,6 +499,38 @@ class JsonQueueReaperBridge extends ReaperBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // Transport Controls
+  // ---------------------------------------------------------------------------
+
+  async play() {
+    return this._sendCommand('play');
+  }
+
+  async stop() {
+    return this._sendCommand('stop');
+  }
+
+  async pause() {
+    return this._sendCommand('pause');
+  }
+
+  async record() {
+    return this._sendCommand('record');
+  }
+
+  async goToPosition({ position, bar } = {}) {
+    return this._sendCommand('goToPosition', { position, bar });
+  }
+
+  async goToStart() {
+    return this._sendCommand('goToStart');
+  }
+
+  async goToEnd() {
+    return this._sendCommand('goToEnd');
+  }
+
+  // ---------------------------------------------------------------------------
   // Pre-Roll / Transport Helpers
   // ---------------------------------------------------------------------------
 

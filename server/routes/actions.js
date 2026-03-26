@@ -94,6 +94,13 @@ const DIRECT_ACTION_MAP = {
       trackId: await resolveTrackId(bridge, args),
       fxChainName: args.fxChainName || args.chainName
     }),
+  play: async (bridge) => bridge.play(),
+  stop: async (bridge) => bridge.stop(),
+  pause: async (bridge) => bridge.pause(),
+  record: async (bridge) => bridge.record(),
+  goToPosition: async (bridge, args) => bridge.goToPosition({ position: args.position, bar: args.bar }),
+  goToStart: async (bridge) => bridge.goToStart(),
+  goToEnd: async (bridge) => bridge.goToEnd(),
   undo: async (bridge) => bridge.undo(),
   redo: async (bridge) => bridge.redo(),
   getTrackFx: async (bridge, args) =>

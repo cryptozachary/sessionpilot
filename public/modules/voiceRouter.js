@@ -407,6 +407,57 @@ window.SessionPilot.VoiceRouter = (() => {
       };
     }
 
+    // --- Transport voice commands ---
+    if (/\b(hit play|play it|play back|playback|start play|press play)\b/.test(text)) {
+      return {
+        kind: 'execute',
+        pending: makePendingAction('play', {}, 'Start playback'),
+        successMessage: 'Playback started.'
+      };
+    }
+
+    if (/\b(hit stop|stop play|stop it|stop record|press stop)\b/.test(text) || /^stop$/.test(text)) {
+      return {
+        kind: 'execute',
+        pending: makePendingAction('stop', {}, 'Stop transport'),
+        successMessage: 'Transport stopped.'
+      };
+    }
+
+    if (/\b(hit pause|pause it|press pause)\b/.test(text) || /^pause$/.test(text)) {
+      return {
+        kind: 'execute',
+        pending: makePendingAction('pause', {}, 'Pause transport'),
+        successMessage: 'Transport paused.'
+      };
+    }
+
+    if (/\b(hit record|start record|press record|roll tape|record now|let'?s? record)\b/.test(text)) {
+      return {
+        kind: 'execute',
+        pending: makePendingAction('record', {}, 'Start recording'),
+        successMessage: 'Recording started.'
+      };
+    }
+
+    if (/\b(go to start|from the top|top of|rewind to start)\b/.test(text)) {
+      return {
+        kind: 'execute',
+        pending: makePendingAction('goToStart', {}, 'Go to project start'),
+        successMessage: 'Cursor at the top.'
+      };
+    }
+
+    if (/\bgo to bar (\d+)\b/.test(text) || /\bjump to bar (\d+)\b/.test(text)) {
+      const barMatch = text.match(/(?:go|jump) to bar (\d+)/);
+      const bar = barMatch ? parseInt(barMatch[1], 10) : 1;
+      return {
+        kind: 'execute',
+        pending: makePendingAction('goToPosition', { bar }, `Go to bar ${bar}`),
+        successMessage: `Cursor moved to bar ${bar}.`
+      };
+    }
+
     if (/\b(marker|bookmark)\b/.test(text)) {
       const markerName = extractMarkerName(transcript);
       return {

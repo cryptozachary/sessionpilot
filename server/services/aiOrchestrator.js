@@ -99,6 +99,36 @@ const INTENT_PATTERNS = [
     intent: 'export_bounce', workflow: 'exportBounce', actionType: 'needs_confirmation'
   },
 
+  // Transport controls (stop must be before play so "stop playback" doesn't match play)
+  {
+    patterns: [/\bstop\s*(play|record|it|the|every)?\b/i, /\bhit\s*stop\b/i, /\bstop\s*playback\b/i, /\bpress\s*stop\b/i],
+    intent: 'transport_stop', actionType: 'safe_action'
+  },
+  {
+    patterns: [/\bhit\s*play\b/i, /\bstart\s*play/i, /\bplay\s*(it|back|the)?\b/i, /\bplayback\b/i, /\bpress\s*play\b/i],
+    intent: 'transport_play', actionType: 'safe_action'
+  },
+  {
+    patterns: [/\bpause\s*(it|play|record)?\b/i, /\bhit\s*pause\b/i],
+    intent: 'transport_pause', actionType: 'safe_action'
+  },
+  {
+    patterns: [/\bstart\s*record/i, /\bhit\s*record\b/i, /\bpress\s*record\b/i, /\broll\s*tape\b/i, /\brecord\s*now\b/i, /\blet'?s?\s*record\b/i],
+    intent: 'transport_record', actionType: 'safe_action'
+  },
+  {
+    patterns: [/\bgo\s*to\s*(the\s*)?start\b/i, /\brewind\s*to\s*(the\s*)?(start|begin)/i, /\btop\s*of\s*(the\s*)?(song|project|session)\b/i, /\bgo\s*to\s*bar\s*1\b/i, /\bfrom\s*the\s*top\b/i],
+    intent: 'transport_goto_start', actionType: 'safe_action'
+  },
+  {
+    patterns: [/\bgo\s*to\s*(the\s*)?end\b/i, /\bjump\s*to\s*(the\s*)?end\b/i],
+    intent: 'transport_goto_end', actionType: 'safe_action'
+  },
+  {
+    patterns: [/\bgo\s*to\s*bar\s*(\d+)\b/i, /\bjump\s*to\s*bar\s*(\d+)\b/i, /\bbar\s*(\d+)\b/i],
+    intent: 'transport_goto_bar', actionType: 'safe_action'
+  },
+
   // Undo / redo
   { patterns: [/\bundo\b/i, /take\s*(that|it)\s*back/i, /reverse\s*(that|last)/i], intent: 'undo', actionType: 'safe_action' },
   { patterns: [/\bredo\b/i, /redo\s*(that|last)/i], intent: 'redo', actionType: 'safe_action' },
@@ -228,6 +258,12 @@ function extractArgs(message, intent) {
       return args;
     }
 
+    case 'transport_play':
+    case 'transport_stop':
+    case 'transport_pause':
+    case 'transport_record':
+    case 'transport_goto_start':
+    case 'transport_goto_end':
     case 'comp_takes':
     case 'rough_mix':
     case 'setup_headphone_mix':
@@ -236,6 +272,12 @@ function extractArgs(message, intent) {
     case 'undo':
     case 'redo':
       return {};
+
+    case 'transport_goto_bar': {
+      const barMatch = message.match(/bar\s*(\d+)/i);
+      if (barMatch) return { bar: parseInt(barMatch[1], 10) };
+      return {};
+    }
 
     case 'batch_recording': {
       const songMatch = message.match(/songs?[:\s]+(.+)/i);
@@ -377,6 +419,108 @@ async function handleDirectAction(bridge, matched, message) {
           type: 'insertMarker',
           args: { name: markerName },
           label: `Insert marker "${markerName}" at cursor`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'transport_play': {
+      return buildResponse(
+        "Rolling playback.",
+        [{
+          type: 'play',
+          args: {},
+          label: 'Start playback',
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'transport_stop': {
+      return buildResponse(
+        "Stopping transport.",
+        [{
+          type: 'stop',
+          args: {},
+          label: 'Stop transport',
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'transport_pause': {
+      return buildResponse(
+        "Pausing transport.",
+        [{
+          type: 'pause',
+          args: {},
+          label: 'Pause transport',
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'transport_record': {
+      return buildResponse(
+        "Starting recording. Make sure your tracks are armed!",
+        [{
+          type: 'record',
+          args: {},
+          label: 'Start recording',
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'transport_goto_start': {
+      return buildResponse(
+        "Moving cursor to the top of the project.",
+        [{
+          type: 'goToStart',
+          args: {},
+          label: 'Go to project start',
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'transport_goto_end': {
+      return buildResponse(
+        "Moving cursor to the end of the project.",
+        [{
+          type: 'goToEnd',
+          args: {},
+          label: 'Go to project end',
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'transport_goto_bar': {
+      const bar = args.bar;
+      if (!bar) {
+        return buildResponse("Which bar do you want to jump to?", [], 'advice', baseContext);
+      }
+      return buildResponse(
+        `Moving cursor to bar ${bar}.`,
+        [{
+          type: 'goToPosition',
+          args: { bar },
+          label: `Go to bar ${bar}`,
           requiresConfirmation: false
         }],
         matched.actionType,

@@ -401,6 +401,69 @@ class ReaperBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // Transport Controls
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Starts playback.
+   * @returns {Promise<Object>} BridgeResult with transport state
+   */
+  async play() {
+    throw new Error('Not implemented: play');
+  }
+
+  /**
+   * Stops playback (and recording).
+   * @returns {Promise<Object>} BridgeResult with transport state
+   */
+  async stop() {
+    throw new Error('Not implemented: stop');
+  }
+
+  /**
+   * Pauses playback.
+   * @returns {Promise<Object>} BridgeResult with transport state
+   */
+  async pause() {
+    throw new Error('Not implemented: pause');
+  }
+
+  /**
+   * Starts recording (arms transport for record).
+   * @returns {Promise<Object>} BridgeResult with transport state
+   */
+  async record() {
+    throw new Error('Not implemented: record');
+  }
+
+  /**
+   * Moves the edit/play cursor to a specific position.
+   * @param {Object} params
+   * @param {number} [params.position] - Position in seconds
+   * @param {number} [params.bar] - Position as bar number
+   * @returns {Promise<Object>} BridgeResult with new cursor position
+   */
+  async goToPosition({ position, bar } = {}) {
+    throw new Error('Not implemented: goToPosition');
+  }
+
+  /**
+   * Moves the cursor to the start of the project.
+   * @returns {Promise<Object>} BridgeResult
+   */
+  async goToStart() {
+    throw new Error('Not implemented: goToStart');
+  }
+
+  /**
+   * Moves the cursor to the end of the project.
+   * @returns {Promise<Object>} BridgeResult
+   */
+  async goToEnd() {
+    throw new Error('Not implemented: goToEnd');
+  }
+
+  // ---------------------------------------------------------------------------
   // Pre-Roll / Transport Helpers
   // ---------------------------------------------------------------------------
 

@@ -135,6 +135,28 @@ window.SessionPilot.QuickActions = (() => {
       args: {},
       needsConfirm: false,
       icon: '\u21A9'
+    },
+    // --- Transport shortcuts ---
+    {
+      label: 'Play',
+      actionType: 'play',
+      args: {},
+      needsConfirm: false,
+      icon: '\u25B6'
+    },
+    {
+      label: 'Stop',
+      actionType: 'stop',
+      args: {},
+      needsConfirm: false,
+      icon: '\u23F9'
+    },
+    {
+      label: 'Record',
+      actionType: 'record',
+      args: {},
+      needsConfirm: false,
+      icon: '\u23FA'
     }
   ];
 

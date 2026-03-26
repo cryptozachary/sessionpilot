@@ -220,6 +220,73 @@ body {
   white-space: nowrap;
 }
 
+/* Transport controls */
+.transport-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.transport-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  width: 28px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.transport-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.transport-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.transport-btn-play.active {
+  background: rgba(83, 215, 105, 0.15);
+  color: var(--accent-green);
+  border-color: rgba(83, 215, 105, 0.3);
+}
+
+.transport-btn-stop.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.transport-btn-pause.active {
+  background: rgba(255, 171, 0, 0.15);
+  color: var(--accent-yellow);
+  border-color: rgba(255, 171, 0, 0.3);
+}
+
+.transport-btn-record {
+  color: var(--accent-red);
+}
+
+.transport-btn-record:hover {
+  background: rgba(233, 69, 96, 0.15);
+  color: var(--accent-red);
+}
+
+.transport-btn-record.active {
+  background: rgba(233, 69, 96, 0.25);
+  color: var(--accent-red);
+  border-color: rgba(233, 69, 96, 0.4);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 /* ----- Main Layout: 3-column grid ----- */
 #main-layout {
   display: grid;

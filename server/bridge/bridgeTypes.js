@@ -96,6 +96,15 @@ const CONFIRMATION_POLICY = {
   // Loop / time selection
   setLoopPoints: RISK_LEVELS.LOW,
 
+  // Transport controls
+  play: RISK_LEVELS.LOW,
+  stop: RISK_LEVELS.LOW,
+  pause: RISK_LEVELS.LOW,
+  record: RISK_LEVELS.MEDIUM,
+  goToPosition: RISK_LEVELS.LOW,
+  goToStart: RISK_LEVELS.LOW,
+  goToEnd: RISK_LEVELS.LOW,
+
   // Undo / redo
   undo: RISK_LEVELS.LOW,
   redo: RISK_LEVELS.LOW,
