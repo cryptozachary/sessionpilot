@@ -29,7 +29,8 @@ module.exports = {
   description: 'Color-code vocal tracks for easy visual identification by role.',
 
   async preview(bridge, args = {}) {
-    const tracks = await bridge.listTracks();
+    const tracksResult = await bridge.listTracks();
+    const tracks = tracksResult.data || [];
     const proposedActions = [];
 
     for (const track of tracks) {
@@ -79,7 +80,8 @@ module.exports = {
   },
 
   async execute(bridge, args = {}) {
-    const tracks = await bridge.listTracks();
+    const tracksResult = await bridge.listTracks();
+    const tracks = tracksResult.data || [];
     const colored = [];
 
     for (const track of tracks) {

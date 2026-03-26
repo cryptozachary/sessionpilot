@@ -18,7 +18,8 @@ module.exports = {
   description: 'Organize session tracks into labeled, color-coded folders by type.',
 
   async preview(bridge, args = {}) {
-    const tracks = await bridge.listTracks();
+    const tracksResult = await bridge.listTracks();
+    const tracks = tracksResult.data || [];
     const vocalTracks = tracks.filter(t => isVocalTrack(t.name));
     const instrumentTracks = tracks.filter(t => isInstrumentTrack(t.name));
 
@@ -103,19 +104,22 @@ module.exports = {
   },
 
   async execute(bridge, args = {}) {
-    const tracks = await bridge.listTracks();
+    const tracksResult = await bridge.listTracks();
+    const tracks = tracksResult.data || [];
     const vocalTracks = tracks.filter(t => isVocalTrack(t.name));
     const instrumentTracks = tracks.filter(t => isInstrumentTrack(t.name));
 
     if (vocalTracks.length > 0) {
-      const vocalFolderId = await bridge.createFolderTrack({ name: 'Vocals', color: VOCAL_COLOR });
+      const vocalFolderResult = await bridge.createFolderTrack({ name: 'Vocals', color: VOCAL_COLOR });
+      const vocalFolderId = vocalFolderResult.data;
       for (const track of vocalTracks) {
         await bridge.setTrackColor(track.id, VOCAL_COLOR);
       }
     }
 
     if (instrumentTracks.length > 0) {
-      const instrumentFolderId = await bridge.createFolderTrack({ name: 'Instruments', color: INSTRUMENT_COLOR });
+      const instrumentFolderResult = await bridge.createFolderTrack({ name: 'Instruments', color: INSTRUMENT_COLOR });
+      const instrumentFolderId = instrumentFolderResult.data;
       for (const track of instrumentTracks) {
         await bridge.setTrackColor(track.id, INSTRUMENT_COLOR);
       }

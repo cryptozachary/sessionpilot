@@ -58,7 +58,8 @@ module.exports = {
   },
 
   async execute(bridge, args = {}) {
-    const trackId = await bridge.createTrack({ name: 'Lead Vocal', color: '#e74c3c' });
+    const trackResult = await bridge.createTrack({ name: 'Lead Vocal', color: '#e74c3c' });
+    const trackId = trackResult.data;
     await bridge.armTrack(trackId);
     await bridge.toggleMonitoring(trackId, true);
 

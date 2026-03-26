@@ -23,6 +23,16 @@ class MockReaperBridge extends ReaperBridge {
     this._tracks = this._initTracks();
     this._markers = this._initMarkers();
     this._regions = this._initRegions();
+    this._sends = [];
+
+    // Project-level loop / time-selection / pre-roll state
+    this._loopEnabled = false;
+    this._loopStart = 0;
+    this._loopEnd = 0;
+    this._timeSelStart = 0;
+    this._timeSelEnd = 0;
+    this._preRollEnabled = false;
+    this._preRollBeats = 4;
 
     this._templates = [
       'Lead Vocal Starter',
@@ -62,7 +72,11 @@ class MockReaperBridge extends ReaperBridge {
         folderDepth: 1,
         parentTrackId: null,
         fxNames: [],
-        itemCount: 0
+        itemCount: 0,
+        volume: 1.0,
+        pan: 0.0,
+        notes: [],
+        takes: []
       }),
       createTrackSummary({
         id: uuidv4(),
@@ -79,7 +93,11 @@ class MockReaperBridge extends ReaperBridge {
         folderDepth: 0,
         parentTrackId: null,
         fxNames: [],
-        itemCount: 2
+        itemCount: 2,
+        volume: 1.0,
+        pan: 0.0,
+        notes: [],
+        takes: []
       }),
       createTrackSummary({
         id: uuidv4(),
@@ -96,7 +114,11 @@ class MockReaperBridge extends ReaperBridge {
         folderDepth: 0,
         parentTrackId: null,
         fxNames: [],
-        itemCount: 3
+        itemCount: 3,
+        volume: 1.0,
+        pan: 0.0,
+        notes: [],
+        takes: []
       }),
       createTrackSummary({
         id: uuidv4(),
@@ -113,7 +135,11 @@ class MockReaperBridge extends ReaperBridge {
         folderDepth: 0,
         parentTrackId: null,
         fxNames: [],
-        itemCount: 3
+        itemCount: 3,
+        volume: 1.0,
+        pan: 0.0,
+        notes: [],
+        takes: []
       }),
       createTrackSummary({
         id: uuidv4(),
@@ -130,7 +156,15 @@ class MockReaperBridge extends ReaperBridge {
         folderDepth: 0,
         parentTrackId: null,
         fxNames: ['ReaEQ', 'ReaComp', 'ReaDelay'],
-        itemCount: 5
+        itemCount: 5,
+        volume: 1.0,
+        pan: 0.0,
+        notes: [],
+        takes: [
+          { index: 0, name: 'Take 1', length: 45.2, isActive: true },
+          { index: 1, name: 'Take 2', length: 44.8, isActive: false },
+          { index: 2, name: 'Take 3', length: 46.1, isActive: false }
+        ]
       }),
       createTrackSummary({
         id: uuidv4(),
@@ -147,7 +181,11 @@ class MockReaperBridge extends ReaperBridge {
         folderDepth: 0,
         parentTrackId: null,
         fxNames: [],
-        itemCount: 2
+        itemCount: 2,
+        volume: 1.0,
+        pan: 0.0,
+        notes: [],
+        takes: []
       }),
       createTrackSummary({
         id: uuidv4(),
@@ -164,7 +202,11 @@ class MockReaperBridge extends ReaperBridge {
         folderDepth: 0,
         parentTrackId: null,
         fxNames: [],
-        itemCount: 2
+        itemCount: 2,
+        volume: 1.0,
+        pan: 0.0,
+        notes: [],
+        takes: []
       }),
       createTrackSummary({
         id: uuidv4(),
@@ -181,7 +223,11 @@ class MockReaperBridge extends ReaperBridge {
         folderDepth: 0,
         parentTrackId: null,
         fxNames: [],
-        itemCount: 4
+        itemCount: 4,
+        volume: 1.0,
+        pan: 0.0,
+        notes: [],
+        takes: []
       })
     ];
   }
@@ -515,6 +561,259 @@ class MockReaperBridge extends ReaperBridge {
     return this._result(true, newFolder, [], [], {
       bridgeType: BRIDGE_TYPES.MOCK
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sends / Routing
+  // ---------------------------------------------------------------------------
+
+  async createSend({ fromTrackId, toTrackId, prePost, volume, pan }) {
+    await this._simulateLatency();
+    const fromTrack = this._findTrack(fromTrackId);
+    if (!fromTrack) return this._trackNotFound(fromTrackId);
+    const toTrack = this._findTrack(toTrackId);
+    if (!toTrack) return this._trackNotFound(toTrackId);
+
+    const send = {
+      id: uuidv4(),
+      fromTrackId,
+      toTrackId,
+      prePost: prePost || 'post',
+      volume: volume !== undefined ? volume : 1.0,
+      pan: pan !== undefined ? pan : 0.0
+    };
+    this._sends.push(send);
+
+    return this._result(true, send, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Track Volume / Pan
+  // ---------------------------------------------------------------------------
+
+  async setTrackVolume({ trackId, volume }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+
+    track.volume = volume;
+    return this._result(true, { trackId, volume: track.volume }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  async setTrackPan({ trackId, pan }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+
+    track.pan = pan;
+    return this._result(true, { trackId, pan: track.pan }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Takes / Items
+  // ---------------------------------------------------------------------------
+
+  async listTakes({ trackId }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+
+    return this._result(true, { trackId, takes: [...track.takes] }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  async setActiveTake({ trackId, itemIndex, takeIndex }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+
+    if (!track.takes || track.takes.length === 0) {
+      return this._result(false, null, [], ['No takes on this track'], {
+        bridgeType: BRIDGE_TYPES.MOCK
+      });
+    }
+
+    if (takeIndex < 0 || takeIndex >= track.takes.length) {
+      return this._result(false, null, [], [`Take index ${takeIndex} out of range`], {
+        bridgeType: BRIDGE_TYPES.MOCK
+      });
+    }
+
+    // Deactivate all, then activate the target
+    track.takes.forEach((t) => { t.isActive = false; });
+    track.takes[takeIndex].isActive = true;
+
+    return this._result(
+      true,
+      { trackId, itemIndex, activeTakeIndex: takeIndex, take: track.takes[takeIndex] },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
+  }
+
+  async splitItemAtCursor({ trackId, itemIndex }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+
+    // Mock a split: return two items based on cursor position
+    const cursorPos = this._playCursor || 0;
+    const leftItem = {
+      itemIndex,
+      start: 0,
+      length: cursorPos > 0 ? cursorPos : 10.0,
+      name: `${track.name} (L)`
+    };
+    const rightItem = {
+      itemIndex: itemIndex + 1,
+      start: leftItem.length,
+      length: 20.0,
+      name: `${track.name} (R)`
+    };
+
+    // Increment the track item count
+    track.itemCount = (track.itemCount || 0) + 1;
+
+    return this._result(
+      true,
+      { trackId, splitPosition: leftItem.length, leftItem, rightItem },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Loop / Time Selection
+  // ---------------------------------------------------------------------------
+
+  async setLoopPoints({ start, end: loopEnd, enabled }) {
+    await this._simulateLatency();
+
+    this._loopStart = start;
+    this._loopEnd = loopEnd;
+    this._loopEnabled = enabled;
+
+    return this._result(
+      true,
+      { loopStart: this._loopStart, loopEnd: this._loopEnd, loopEnabled: this._loopEnabled },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
+  }
+
+  async setTimeSelection({ start, end: selEnd }) {
+    await this._simulateLatency();
+
+    this._timeSelStart = start;
+    this._timeSelEnd = selEnd;
+
+    return this._result(
+      true,
+      { timeSelStart: this._timeSelStart, timeSelEnd: this._timeSelEnd },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pre-Roll / Transport Helpers
+  // ---------------------------------------------------------------------------
+
+  async enablePreRoll({ enabled, beats }) {
+    await this._simulateLatency();
+
+    this._preRollEnabled = enabled;
+    if (beats !== undefined) {
+      this._preRollBeats = beats;
+    }
+
+    return this._result(
+      true,
+      { preRollEnabled: this._preRollEnabled, preRollBeats: this._preRollBeats },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // System / Info
+  // ---------------------------------------------------------------------------
+
+  async getBufferSize() {
+    await this._simulateLatency();
+    return this._result(
+      true,
+      { bufferSize: 256, sampleRate: 48000, estimatedLatency: 5.3 },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
+  }
+
+  async getDiskSpace() {
+    await this._simulateLatency();
+    return this._result(
+      true,
+      {
+        availableGB: 142.7,
+        recordingPath: '/Users/artist/Projects',
+        estimatedMinutesAt48k: 3200
+      },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Track Metadata
+  // ---------------------------------------------------------------------------
+
+  async addTrackNote({ trackId, note }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+
+    if (!track.notes) {
+      track.notes = [];
+    }
+    track.notes.push(note);
+
+    return this._result(
+      true,
+      { trackId, note, allNotes: [...track.notes] },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
+  }
+
+  async setAutoFade({ trackId, enabled }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+
+    track.autoFade = enabled;
+
+    return this._result(
+      true,
+      { trackId, autoFade: track.autoFade },
+      [],
+      [],
+      { bridgeType: BRIDGE_TYPES.MOCK }
+    );
   }
 
   // ---------------------------------------------------------------------------

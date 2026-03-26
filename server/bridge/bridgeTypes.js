@@ -37,7 +37,14 @@ const WORKFLOW_NAMES = {
   ORGANIZE_SESSION_TRACKS: 'organizeSessionTracks',
   COLOR_CODE_VOCALS: 'colorCodeVocals',
   DIAGNOSE_MONITORING_ISSUE: 'diagnoseMonitoringIssue',
-  DIAGNOSE_LOW_INPUT_ISSUE: 'diagnoseLowInputIssue'
+  DIAGNOSE_LOW_INPUT_ISSUE: 'diagnoseLowInputIssue',
+  SETUP_HEADPHONE_MIX: 'setupHeadphoneMix',
+  COMP_TAKES: 'compTakes',
+  ROUGH_MIX: 'roughMix',
+  MARK_SONG_STRUCTURE: 'markSongStructure',
+  SESSION_NOTES: 'sessionNotes',
+  PREFLIGHT_CHECK: 'preflightCheck',
+  QUICK_PUNCH_LOOP: 'quickPunchLoop'
 };
 
 /**
@@ -71,6 +78,20 @@ const CONFIRMATION_POLICY = {
   createRegion: RISK_LEVELS.MEDIUM,
   loadTrackTemplate: RISK_LEVELS.MEDIUM,
   loadFxChain: RISK_LEVELS.MEDIUM,
+
+  // Sends / routing
+  createSend: RISK_LEVELS.MEDIUM,
+
+  // Volume / pan
+  setTrackVolume: RISK_LEVELS.LOW,
+  setTrackPan: RISK_LEVELS.LOW,
+
+  // Takes / items
+  setActiveTake: RISK_LEVELS.MEDIUM,
+  splitItemAtCursor: RISK_LEVELS.MEDIUM,
+
+  // Loop / time selection
+  setLoopPoints: RISK_LEVELS.LOW,
 
   // Workflow operations - high risk, always require confirmation
   executeWorkflow: RISK_LEVELS.HIGH,

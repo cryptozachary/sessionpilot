@@ -64,9 +64,11 @@ module.exports = {
   },
 
   async execute(bridge, args = {}) {
-    const folderId = await bridge.createFolderTrack({ name: 'Vocals', color: '#2ecc71' });
+    const folderResult = await bridge.createFolderTrack({ name: 'Vocals', color: '#2ecc71' });
+    const folderId = folderResult.data;
 
-    const leadId = await bridge.createTrack({ name: 'Lead Vocal', color: '#e74c3c', parent: folderId });
+    const leadResult = await bridge.createTrack({ name: 'Lead Vocal', color: '#e74c3c', parent: folderId });
+    const leadId = leadResult.data;
     await bridge.createTrack({ name: 'Double L', color: '#e67e22', parent: folderId });
     await bridge.createTrack({ name: 'Double R', color: '#f39c12', parent: folderId });
     await bridge.createTrack({ name: 'Adlibs', color: '#9b59b6', parent: folderId });

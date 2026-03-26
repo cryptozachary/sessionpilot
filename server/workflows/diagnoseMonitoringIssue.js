@@ -52,14 +52,16 @@ module.exports = {
   },
 
   async execute(bridge, args = {}) {
-    const tracks = await bridge.listTracks();
-    const selectedTrack = await bridge.getSelectedTrack();
+    const tracksResult = await bridge.listTracks();
+    const tracks = tracksResult.data || [];
+    const selectedTrackResult = await bridge.getSelectedTrack();
+    const selectedTrack = selectedTrackResult.data || null;
 
     const checklist = [];
     const proposedActions = [];
 
     // Check 1: Is any track armed?
-    const armedTracks = tracks.filter(t => t.armed);
+    const armedTracks = tracks.filter(t => t.isArmed);
     if (armedTracks.length === 0) {
       checklist.push({
         step: 'Check if any track is armed',
@@ -75,8 +77,8 @@ module.exports = {
     }
 
     // Check 2: Is monitoring enabled on armed tracks?
-    const armedWithMonitoring = armedTracks.filter(t => t.monitoring);
-    const armedWithoutMonitoring = armedTracks.filter(t => !t.monitoring);
+    const armedWithMonitoring = armedTracks.filter(t => t.monitoringOn);
+    const armedWithoutMonitoring = armedTracks.filter(t => !t.monitoringOn);
     if (armedTracks.length > 0 && armedWithMonitoring.length === 0) {
       checklist.push({
         step: 'Check if monitoring is enabled on armed tracks',
@@ -105,7 +107,7 @@ module.exports = {
 
     // Check 3: Is the selected track muted or soloed elsewhere?
     if (selectedTrack) {
-      if (selectedTrack.muted) {
+      if (selectedTrack.isMuted) {
         checklist.push({
           step: 'Check if the track is muted',
           status: 'fail',
@@ -119,7 +121,7 @@ module.exports = {
         });
       }
 
-      const soloedTracks = tracks.filter(t => t.soloed && t.id !== selectedTrack.id);
+      const soloedTracks = tracks.filter(t => t.isSolo && t.id !== selectedTrack.id);
       if (soloedTracks.length > 0) {
         checklist.push({
           step: 'Check if another track is soloed',
@@ -143,7 +145,7 @@ module.exports = {
 
     // Check 4: Is there an input assigned?
     if (selectedTrack) {
-      if (!selectedTrack.input || selectedTrack.input === 'None') {
+      if (!selectedTrack.inputLabel || selectedTrack.inputLabel === 'None') {
         checklist.push({
           step: 'Check if there is an input assigned',
           status: 'fail',
@@ -153,7 +155,7 @@ module.exports = {
         checklist.push({
           step: 'Check if there is an input assigned',
           status: 'pass',
-          detail: `Input assigned: ${selectedTrack.input}.`
+          detail: `Input assigned: ${selectedTrack.inputLabel}.`
         });
       }
     } else {
@@ -172,7 +174,7 @@ module.exports = {
     });
 
     // If monitoring is off on the selected armed track, propose turning it on
-    if (selectedTrack && selectedTrack.armed && !selectedTrack.monitoring) {
+    if (selectedTrack && selectedTrack.isArmed && !selectedTrack.monitoringOn) {
       proposedActions.push({
         id: uuidv4(),
         type: 'toggleMonitoring',

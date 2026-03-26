@@ -61,6 +61,50 @@ window.SessionPilot.QuickActions = (() => {
       needsConfirm: true,
       icon: '\u{1F4CB}',
       destructive: true
+    },
+    // --- Session workflows ---
+    {
+      label: 'Pre-flight',
+      workflow: 'preflightCheck',
+      args: {},
+      needsConfirm: false,
+      icon: '\u2705'
+    },
+    {
+      label: 'Cue Mix',
+      workflow: 'setupHeadphoneMix',
+      args: {},
+      needsConfirm: true,
+      icon: '\u{1F3A7}'
+    },
+    {
+      label: 'Rough Mix',
+      workflow: 'roughMix',
+      args: {},
+      needsConfirm: true,
+      icon: '\u{1F39B}'
+    },
+    {
+      label: 'Song Map',
+      workflow: 'markSongStructure',
+      args: {},
+      needsConfirm: false,
+      icon: '\u{1F5FA}'
+    },
+    {
+      label: 'Comp Takes',
+      workflow: 'compTakes',
+      args: {},
+      needsConfirm: false,
+      icon: '\u{1F3AF}'
+    },
+    {
+      label: 'Punch Loop',
+      workflow: 'quickPunchLoop',
+      args: {},
+      needsConfirm: false,
+      icon: '\u{1F501}',
+      promptForArgs: true
     }
   ];
 
@@ -94,6 +138,17 @@ window.SessionPilot.QuickActions = (() => {
   }
 
   async function executeQuickAction(action, btn) {
+    // For actions that need user input, prompt via the chat input
+    if (action.promptForArgs) {
+      const chatInput = document.getElementById('chat-input');
+      if (chatInput) {
+        chatInput.value = `${action.label.toLowerCase()} bars `;
+        chatInput.focus();
+        State().addChatMessage('assistant', `Type the bar range for **${action.label}**, e.g. "punch loop bars 8 to 16". You can also add pre-roll like "2 beat pre-roll".`);
+      }
+      return;
+    }
+
     if (action.needsConfirm) {
       // Preview the action and show confirmation modal
       try {

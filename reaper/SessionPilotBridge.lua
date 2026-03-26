@@ -669,6 +669,308 @@ commands.createRegion = function(args)
   }
 end
 
+commands.createSend = function(args)
+  local fromTrack = findTrackById(args.fromTrackId)
+  if not fromTrack then return { ok = false, errors = {"Source track not found"} } end
+  local toTrack = findTrackById(args.toTrackId)
+  if not toTrack then return { ok = false, errors = {"Destination track not found"} } end
+
+  local sendIdx = reaper.CreateTrackSend(fromTrack, toTrack)
+  if sendIdx < 0 then
+    return { ok = false, errors = {"Failed to create send"} }
+  end
+
+  -- Set send volume (default 1.0 = unity)
+  local vol = args.volume or 1.0
+  reaper.SetTrackSendInfo_Value(fromTrack, 0, sendIdx, "D_VOL", vol)
+
+  -- Set send pan (default 0.0 = center)
+  local pan = args.pan or 0.0
+  reaper.SetTrackSendInfo_Value(fromTrack, 0, sendIdx, "D_PAN", pan)
+
+  -- Set pre/post fader: 0 = post-fader, 1 = pre-fx, 3 = pre-fader
+  if args.prePost == "pre" then
+    reaper.SetTrackSendInfo_Value(fromTrack, 0, sendIdx, "I_SENDMODE", 3)
+  else
+    reaper.SetTrackSendInfo_Value(fromTrack, 0, sendIdx, "I_SENDMODE", 0)
+  end
+
+  return {
+    ok = true,
+    data = {
+      sendIndex = sendIdx,
+      fromTrackId = args.fromTrackId,
+      toTrackId = args.toTrackId,
+      volume = vol,
+      pan = pan,
+      prePost = args.prePost or "post"
+    }
+  }
+end
+
+commands.setTrackVolume = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+  reaper.SetMediaTrackInfo_Value(track, "D_VOL", args.volume)
+  return { ok = true, data = { trackId = args.trackId, volume = args.volume } }
+end
+
+commands.setTrackPan = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+  reaper.SetMediaTrackInfo_Value(track, "D_PAN", args.pan)
+  return { ok = true, data = { trackId = args.trackId, pan = args.pan } }
+end
+
+commands.listTakes = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+
+  local items = {}
+  local itemCount = reaper.CountTrackMediaItems(track)
+  for i = 0, itemCount - 1 do
+    local item = reaper.GetTrackMediaItem(track, i)
+    local takeCount = reaper.CountTakes(item)
+    local activeTakeIdx = -1
+    local activeTake = reaper.GetActiveTake(item)
+
+    local takes = {}
+    for j = 0, takeCount - 1 do
+      local take = reaper.GetMediaItemTake(item, j)
+      local _, takeName = reaper.GetSetMediaItemTakeInfo_String(take, "P_NAME", "", false)
+      local takeLen = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
+      local isActive = (take == activeTake)
+      if isActive then activeTakeIdx = j end
+      takes[#takes + 1] = {
+        index = j,
+        name = takeName,
+        length = takeLen,
+        isActive = isActive
+      }
+    end
+
+    items[#items + 1] = {
+      itemIndex = i,
+      takeCount = takeCount,
+      activeTakeIndex = activeTakeIdx,
+      takes = takes
+    }
+  end
+
+  return { ok = true, data = { trackId = args.trackId, items = items } }
+end
+
+commands.setActiveTake = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+
+  local item = reaper.GetTrackMediaItem(track, args.itemIndex)
+  if not item then return { ok = false, errors = {"Item not found at index " .. args.itemIndex} } end
+
+  local take = reaper.GetMediaItemTake(item, args.takeIndex)
+  if not take then return { ok = false, errors = {"Take not found at index " .. args.takeIndex} } end
+
+  reaper.SetActiveTake(take)
+  return {
+    ok = true,
+    data = {
+      trackId = args.trackId,
+      itemIndex = args.itemIndex,
+      activeTakeIndex = args.takeIndex
+    }
+  }
+end
+
+commands.splitItemAtCursor = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+
+  local item = reaper.GetTrackMediaItem(track, args.itemIndex)
+  if not item then return { ok = false, errors = {"Item not found at index " .. args.itemIndex} } end
+
+  local cursorPos = reaper.GetCursorPosition()
+  local itemStart = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
+  local itemEnd = itemStart + reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
+
+  if cursorPos <= itemStart or cursorPos >= itemEnd then
+    return { ok = false, errors = {"Cursor is not within the item boundaries"} }
+  end
+
+  local newItem = reaper.SplitMediaItem(item, cursorPos)
+  if not newItem then
+    return { ok = false, errors = {"Failed to split item"} }
+  end
+
+  return {
+    ok = true,
+    data = {
+      trackId = args.trackId,
+      splitPosition = cursorPos,
+      leftItemLength = cursorPos - itemStart,
+      rightItemLength = itemEnd - cursorPos
+    }
+  }
+end
+
+commands.setLoopPoints = function(args)
+  local startPos = args.start or 0
+  local endPos = args["end"] or 0
+  -- GetSet_LoopTimeRange(isSet, isLoop, start, end, allowAutoSeek)
+  reaper.GetSet_LoopTimeRange(true, true, startPos, endPos, false)
+  -- Enable or disable repeat/loop
+  if args.enabled then
+    reaper.SetRepeatState(1)
+  else
+    reaper.SetRepeatState(0)
+  end
+  return {
+    ok = true,
+    data = {
+      loopStart = startPos,
+      loopEnd = endPos,
+      loopEnabled = args.enabled
+    }
+  }
+end
+
+commands.setTimeSelection = function(args)
+  local startPos = args.start or 0
+  local endPos = args["end"] or 0
+  -- GetSet_LoopTimeRange(isSet, isLoop, start, end, allowAutoSeek)
+  -- isLoop=false sets time selection rather than loop points
+  reaper.GetSet_LoopTimeRange(true, false, startPos, endPos, false)
+  return {
+    ok = true,
+    data = {
+      timeSelStart = startPos,
+      timeSelEnd = endPos
+    }
+  }
+end
+
+commands.enablePreRoll = function(args)
+  local beats = args.beats or 4
+  -- NOTE: Requires SWS extension for SNM_SetIntConfigVar.
+  -- "projpreroll" controls the pre-roll length in beats.
+  if reaper.SNM_SetIntConfigVar then
+    if args.enabled then
+      reaper.SNM_SetIntConfigVar("projpreroll", beats)
+    else
+      reaper.SNM_SetIntConfigVar("projpreroll", 0)
+    end
+    return {
+      ok = true,
+      data = {
+        preRollEnabled = args.enabled,
+        preRollBeats = args.enabled and beats or 0
+      }
+    }
+  else
+    return {
+      ok = false,
+      errors = {"SWS extension not installed — SNM_SetIntConfigVar unavailable"},
+      warnings = {"Install the SWS extension for pre-roll support"}
+    }
+  end
+end
+
+commands.getBufferSize = function(args)
+  -- Try SWS extension first for direct config access
+  local bufSize = 0
+  if reaper.SNM_GetIntConfigVar then
+    bufSize = reaper.SNM_GetIntConfigVar("audiodev_bufsize", 0)
+  end
+  local sr = reaper.GetSetProjectInfo(0, "PROJECT_SRATE", 0, false)
+  if sr == 0 then sr = 44100 end
+  -- Estimated latency in ms = (bufferSize / sampleRate) * 1000
+  local latency = 0
+  if bufSize > 0 then
+    latency = (bufSize / sr) * 1000
+  end
+  return {
+    ok = true,
+    data = {
+      bufferSize = bufSize,
+      sampleRate = sr,
+      estimatedLatency = latency
+    }
+  }
+end
+
+commands.getDiskSpace = function(args)
+  -- NOTE: Lua has limited native disk access. We return the recording path
+  -- from the project settings but cannot reliably query free disk space
+  -- across platforms without an external library.
+  local projPath = reaper.GetProjectPath("")
+  return {
+    ok = true,
+    data = {
+      recordingPath = projPath,
+      note = "Disk space query not available from Lua; check OS tools"
+    },
+    warnings = {"Disk space reporting requires OS-level access not available in ReaScript Lua"}
+  }
+end
+
+commands.addTrackNote = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+
+  -- Try SWS extension first (NF_SetSWSTrackNotes)
+  if reaper.NF_SetSWSTrackNotes then
+    -- Append to existing notes
+    local existing = reaper.NF_GetSWSTrackNotes(track) or ""
+    local newNotes
+    if existing ~= "" then
+      newNotes = existing .. "\n" .. args.note
+    else
+      newNotes = args.note
+    end
+    reaper.NF_SetSWSTrackNotes(track, newNotes)
+    return {
+      ok = true,
+      data = { trackId = args.trackId, note = args.note, allNotes = newNotes }
+    }
+  else
+    -- Fallback: store in track extended state
+    local key = "SessionPilot_Notes"
+    local existing = ({reaper.GetSetMediaTrackInfo_String(track, "P_EXT:" .. key, "", false)})[2] or ""
+    local newNotes
+    if existing ~= "" then
+      newNotes = existing .. "\n" .. args.note
+    else
+      newNotes = args.note
+    end
+    reaper.GetSetMediaTrackInfo_String(track, "P_EXT:" .. key, newNotes, true)
+    return {
+      ok = true,
+      data = { trackId = args.trackId, note = args.note, allNotes = newNotes },
+      warnings = {"SWS not installed; notes stored in track extended state"}
+    }
+  end
+end
+
+commands.setAutoFade = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+
+  -- REAPER auto-crossfade is a global project setting (Options > Crossfade),
+  -- but per-item overlap behavior is controlled by item auto-fade flags.
+  -- We toggle the free item positioning mode per-track by setting
+  -- I_FREEMODE which controls how overlapping items behave.
+  -- 0 = normal (items cannot overlap), 1 = free positioning (overlapping allowed)
+  if args.enabled then
+    reaper.SetMediaTrackInfo_Value(track, "I_FREEMODE", 0)
+  else
+    reaper.SetMediaTrackInfo_Value(track, "I_FREEMODE", 1)
+  end
+
+  return {
+    ok = true,
+    data = { trackId = args.trackId, autoFade = args.enabled }
+  }
+end
+
 ---------------------------------------------------------------------------
 -- Write state snapshot
 ---------------------------------------------------------------------------

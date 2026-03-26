@@ -75,7 +75,8 @@ module.exports = {
   async execute(bridge, args = {}) {
     const { startBar, endBar, trackId } = args;
 
-    const resolvedTrackId = trackId || (await bridge.getSelectedTrack()).id;
+    const selectedTrackResult = await bridge.getSelectedTrack();
+    const resolvedTrackId = trackId || (selectedTrackResult.data && selectedTrackResult.data.id);
 
     await bridge.createRegion({
       name: `Punch In: Bar ${startBar}-${endBar}`,

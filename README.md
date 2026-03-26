@@ -120,6 +120,13 @@ Method signatures use JSON-schema-friendly argument objects.
 | colorCodeVocals | Color-code vocal tracks by role |
 | diagnoseMonitoringIssue | Troubleshoot "can't hear myself" |
 | diagnoseLowInputIssue | Troubleshoot low input levels |
+| setupHeadphoneMix | Set up a cue mix with reverb for vocal monitoring |
+| compTakes | Review and manage vocal takes for comping |
+| roughMix | Quick rough mix with levels, panning, and bussing |
+| markSongStructure | Mark verse/chorus/bridge sections with markers and regions |
+| sessionNotes | Add timestamped session notes as markers |
+| preflightCheck | Pre-session checklist for recording readiness |
+| quickPunchLoop | Loop punch-in with pre-roll and auto-crossfade |
 
 ## License
 

@@ -45,15 +45,17 @@ module.exports = {
   },
 
   async execute(bridge, args = {}) {
-    const tracks = await bridge.listTracks();
-    const selectedTrack = await bridge.getSelectedTrack();
+    const tracksResult = await bridge.listTracks();
+    const tracks = tracksResult.data || [];
+    const selectedTrackResult = await bridge.getSelectedTrack();
+    const selectedTrack = selectedTrackResult.data || null;
 
     const checklist = [];
     const proposedActions = [];
 
     // Check 1: Is there an input assigned?
     if (selectedTrack) {
-      if (!selectedTrack.input || selectedTrack.input === 'None') {
+      if (!selectedTrack.inputLabel || selectedTrack.inputLabel === 'None') {
         checklist.push({
           step: 'Check if there is an input assigned',
           status: 'fail',
@@ -63,7 +65,7 @@ module.exports = {
         checklist.push({
           step: 'Check if there is an input assigned',
           status: 'pass',
-          detail: `Input assigned: ${selectedTrack.input}.`
+          detail: `Input assigned: ${selectedTrack.inputLabel}.`
         });
       }
     } else {
@@ -76,7 +78,7 @@ module.exports = {
 
     // Check 2: Is the track armed?
     if (selectedTrack) {
-      if (!selectedTrack.armed) {
+      if (!selectedTrack.isArmed) {
         checklist.push({
           step: 'Check if the track is armed',
           status: 'fail',
@@ -149,13 +151,13 @@ module.exports = {
     });
 
     // Check 7: Monitoring mode
-    if (selectedTrack && selectedTrack.monitoring) {
+    if (selectedTrack && selectedTrack.monitoringOn) {
       checklist.push({
         step: 'Check monitoring mode: input vs software monitoring',
         status: 'pass',
         detail: 'Software input monitoring is enabled. If your interface also has direct monitoring turned on, you may hear a doubled signal but levels should be present.'
       });
-    } else if (selectedTrack && !selectedTrack.monitoring) {
+    } else if (selectedTrack && !selectedTrack.monitoringOn) {
       checklist.push({
         step: 'Check monitoring mode: input vs software monitoring',
         status: 'warning',

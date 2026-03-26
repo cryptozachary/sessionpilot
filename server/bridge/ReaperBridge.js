@@ -293,6 +293,175 @@ class ReaperBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // Sends / Routing
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Creates a send from one track to another.
+   * @param {Object} params
+   * @param {string} params.fromTrackId - Source track ID
+   * @param {string} params.toTrackId - Destination track ID
+   * @param {string} [params.prePost] - Pre/post fader ('pre' or 'post')
+   * @param {number} [params.volume] - Send volume (0.0 to 2.0)
+   * @param {number} [params.pan] - Send pan (-1.0 to 1.0)
+   * @returns {Promise<Object>} BridgeResult with send info
+   */
+  async createSend({ fromTrackId, toTrackId, prePost, volume, pan }) {
+    throw new Error('Not implemented: createSend');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Track Volume / Pan
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sets a track's volume.
+   * @param {Object} params
+   * @param {string} params.trackId - Track to modify
+   * @param {number} params.volume - Volume level (0.0 to 2.0, 1.0 = unity)
+   * @returns {Promise<Object>} BridgeResult
+   */
+  async setTrackVolume({ trackId, volume }) {
+    throw new Error('Not implemented: setTrackVolume');
+  }
+
+  /**
+   * Sets a track's pan position.
+   * @param {Object} params
+   * @param {string} params.trackId - Track to modify
+   * @param {number} params.pan - Pan position (-1.0 left to 1.0 right)
+   * @returns {Promise<Object>} BridgeResult
+   */
+  async setTrackPan({ trackId, pan }) {
+    throw new Error('Not implemented: setTrackPan');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Takes / Items
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Lists all takes/items on a track.
+   * @param {Object} params
+   * @param {string} params.trackId - Track to query
+   * @returns {Promise<Object>} Array of takes wrapped in BridgeResult
+   */
+  async listTakes({ trackId }) {
+    throw new Error('Not implemented: listTakes');
+  }
+
+  /**
+   * Sets the active take on a media item.
+   * @param {Object} params
+   * @param {string} params.trackId - Track containing the item
+   * @param {number} params.itemIndex - Item index on the track
+   * @param {number} params.takeIndex - Take index to activate
+   * @returns {Promise<Object>} BridgeResult
+   */
+  async setActiveTake({ trackId, itemIndex, takeIndex }) {
+    throw new Error('Not implemented: setActiveTake');
+  }
+
+  /**
+   * Splits a media item at the edit cursor position.
+   * @param {Object} params
+   * @param {string} params.trackId - Track containing the item
+   * @param {number} params.itemIndex - Item index on the track
+   * @returns {Promise<Object>} BridgeResult with the two resulting items
+   */
+  async splitItemAtCursor({ trackId, itemIndex }) {
+    throw new Error('Not implemented: splitItemAtCursor');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Loop / Time Selection
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sets the loop points and enables/disables looping.
+   * @param {Object} params
+   * @param {number} params.start - Loop start position in seconds
+   * @param {number} params.end - Loop end position in seconds
+   * @param {boolean} params.enabled - Whether looping is enabled
+   * @returns {Promise<Object>} BridgeResult with loop config
+   */
+  async setLoopPoints({ start, end, enabled }) {
+    throw new Error('Not implemented: setLoopPoints');
+  }
+
+  /**
+   * Sets the time selection range.
+   * @param {Object} params
+   * @param {number} params.start - Selection start in seconds
+   * @param {number} params.end - Selection end in seconds
+   * @returns {Promise<Object>} BridgeResult with selection info
+   */
+  async setTimeSelection({ start, end }) {
+    throw new Error('Not implemented: setTimeSelection');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pre-Roll / Transport Helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Enables or disables pre-roll with an optional beat count.
+   * @param {Object} params
+   * @param {boolean} params.enabled - Whether pre-roll is enabled
+   * @param {number} [params.beats] - Number of pre-roll beats
+   * @returns {Promise<Object>} BridgeResult with pre-roll config
+   */
+  async enablePreRoll({ enabled, beats }) {
+    throw new Error('Not implemented: enablePreRoll');
+  }
+
+  // ---------------------------------------------------------------------------
+  // System / Info
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns the current audio buffer size and related info.
+   * @returns {Promise<Object>} BridgeResult with buffer size, sample rate, latency
+   */
+  async getBufferSize() {
+    throw new Error('Not implemented: getBufferSize');
+  }
+
+  /**
+   * Returns available disk space for recording.
+   * @returns {Promise<Object>} BridgeResult with disk space info
+   */
+  async getDiskSpace() {
+    throw new Error('Not implemented: getDiskSpace');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Track Metadata
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a note/comment to a track.
+   * @param {Object} params
+   * @param {string} params.trackId - Track to annotate
+   * @param {string} params.note - Note text to add
+   * @returns {Promise<Object>} BridgeResult
+   */
+  async addTrackNote({ trackId, note }) {
+    throw new Error('Not implemented: addTrackNote');
+  }
+
+  /**
+   * Enables or disables auto-crossfade on a track.
+   * @param {Object} params
+   * @param {string} params.trackId - Track to modify
+   * @param {boolean} params.enabled - Whether auto-crossfade is enabled
+   * @returns {Promise<Object>} BridgeResult
+   */
+  async setAutoFade({ trackId, enabled }) {
+    throw new Error('Not implemented: setAutoFade');
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 

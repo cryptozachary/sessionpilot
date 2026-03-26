@@ -14,6 +14,11 @@ const INTENT_PATTERNS = [
     patterns: [/lead.*double.*adlib/i, /vocal\s*stack/i, /doubles?\s*(and|&)\s*adlib/i, /full\s*vocal/i, /set\s*up.*(lead|double|adlib)/i, /make.*(lead|double|adlib)/i],
     intent: 'setup_vocal_stack', workflow: 'setupLeadDoubleAdlib', actionType: 'needs_confirmation'
   },
+  // Quick punch loop (must be before preparePunchIn so "loop punch" matches here)
+  {
+    patterns: [/loop.*punch/i, /punch.*loop/i, /loop\s*record/i, /loop.*bar/i, /keep\s*loop/i, /nail\s*(this|it|the)\s*(part|section)/i, /loop\s*(the|this)/i],
+    intent: 'quick_punch_loop', workflow: 'quickPunchLoop', actionType: 'safe_action'
+  },
   {
     patterns: [/punch\s*in/i, /punch.*bar/i, /re-?record.*section/i, /drop\s*in/i],
     intent: 'prepare_punch_in', workflow: 'preparePunchIn', actionType: 'safe_action'
@@ -35,6 +40,42 @@ const INTENT_PATTERNS = [
   {
     patterns: [/low\s*(input|level|volume|gain|signal)/i, /quiet/i, /too\s*low/i, /barely\s*hear/i, /weak\s*signal/i, /input.*low/i],
     intent: 'diagnose_low_input', workflow: 'diagnoseLowInputIssue', actionType: 'advice'
+  },
+
+  // Headphone / cue mix
+  {
+    patterns: [/headphone/i, /cue\s*mix/i, /hear\s*(myself|reverb).*while.*record/i, /monitor.*mix/i, /vocal.*reverb.*headphone/i],
+    intent: 'setup_headphone_mix', workflow: 'setupHeadphoneMix', actionType: 'needs_confirmation'
+  },
+
+  // Comp takes
+  {
+    patterns: [/comp/i, /best\s*take/i, /pick.*take/i, /choose.*take/i, /review.*take/i, /which\s*take/i, /takes?\s*(on|for)/i],
+    intent: 'comp_takes', workflow: 'compTakes', actionType: 'safe_action'
+  },
+
+  // Rough mix
+  {
+    patterns: [/rough\s*mix/i, /quick\s*mix/i, /balance.*vocals?/i, /pan.*double/i, /set.*levels?/i, /level.*vocal/i, /mix\s*it\s*quick/i],
+    intent: 'rough_mix', workflow: 'roughMix', actionType: 'needs_confirmation'
+  },
+
+  // Mark song structure
+  {
+    patterns: [/mark.*structure/i, /song\s*structure/i, /section.*marker/i, /verse.*chorus/i, /mark.*verse/i, /mark.*chorus/i, /mark.*bridge/i, /map.*song/i],
+    intent: 'mark_song_structure', workflow: 'markSongStructure', actionType: 'safe_action'
+  },
+
+  // Session notes
+  {
+    patterns: [/session\s*note/i, /add\s*(a\s*)?note/i, /mark\s*this/i, /remember\s*this/i, /note\s*(here|at)/i, /flag\s*this/i, /bookmark/i],
+    intent: 'session_notes', workflow: 'sessionNotes', actionType: 'safe_action'
+  },
+
+  // Preflight check
+  {
+    patterns: [/pre-?flight/i, /ready\s*to\s*record/i, /check.*setup/i, /everything\s*(good|ready|set)/i, /session\s*check/i, /before\s*(we|I)\s*record/i, /am\s*I\s*good/i],
+    intent: 'preflight_check', workflow: 'preflightCheck', actionType: 'advice'
   },
 
   // Simple track actions
@@ -115,6 +156,58 @@ function extractArgs(message, intent) {
       if (labelMatch) return { name: labelMatch[1].trim() };
       return {};
     }
+
+    case 'mark_song_structure': {
+      // Parse section names and bar numbers, e.g. "verse at bar 9, chorus at 25, bridge at 33"
+      const sections = [];
+      const sectionPattern = /(intro|verse|pre-?chorus|chorus|hook|bridge|outro|break|solo|interlude)\s*(?:at\s*)?(?:bar\s*)?(\d+)/gi;
+      let match;
+      while ((match = sectionPattern.exec(message)) !== null) {
+        sections.push({ name: match[1], bar: parseInt(match[2], 10) });
+      }
+      if (sections.length > 0) return { sections };
+      return {};
+    }
+
+    case 'session_notes': {
+      // Extract note text from the message
+      const notePatterns = [
+        /(?:session\s*note|add\s*(?:a\s*)?note|note\s*(?:here|at))[:\s]+["']?(.+?)["']?\s*$/i,
+        /(?:mark\s*this|remember\s*this|flag\s*this|bookmark)[:\s]+["']?(.+?)["']?\s*$/i
+      ];
+      for (const pat of notePatterns) {
+        const noteMatch = message.match(pat);
+        if (noteMatch && noteMatch[1]) return { note: noteMatch[1].trim() };
+      }
+      return {};
+    }
+
+    case 'quick_punch_loop': {
+      // Parse bar range like "bars X to Y" or "bar X-Y", and optional pre-roll
+      const args = {};
+      const rangeMatch = message.match(/bars?\s*(\d+)\s*(?:to|-)\s*(\d+)/i);
+      if (rangeMatch) {
+        args.startBar = parseInt(rangeMatch[1], 10);
+        args.endBar = parseInt(rangeMatch[2], 10);
+      } else {
+        const singleMatch = message.match(/bar\s*(\d+)/i);
+        if (singleMatch) {
+          args.startBar = parseInt(singleMatch[1], 10);
+        }
+      }
+      // Extract pre-roll beats if mentioned, e.g. "2 beat pre-roll" or "pre-roll 4 beats"
+      const preRollMatch = message.match(/(\d+)\s*beats?\s*pre-?roll|pre-?roll\s*(?:of\s*)?(\d+)\s*beats?/i);
+      if (preRollMatch) {
+        args.preRollBeats = parseInt(preRollMatch[1] || preRollMatch[2], 10);
+      }
+      return args;
+    }
+
+    case 'comp_takes':
+    case 'rough_mix':
+    case 'setup_headphone_mix':
+    case 'preflight_check':
+      return {};
 
     default:
       return {};
