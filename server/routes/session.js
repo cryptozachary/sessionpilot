@@ -86,6 +86,65 @@ module.exports = function createSessionRoutes(bridge) {
     }
   });
 
+  // GET /api/health - health check with bridge status and system info
+  router.get('/api/health', async (req, res) => {
+    try {
+      const [connectionResult, sessionResult] = await Promise.allSettled([
+        bridge.getConnectionStatus(),
+        bridge.getProjectSummary()
+      ]);
+
+      const connection = connectionResult.status === 'fulfilled' && connectionResult.value
+        ? connectionResult.value.data
+        : { connected: false, bridgeType: 'unknown' };
+
+      const session = sessionResult.status === 'fulfilled' && sessionResult.value
+        ? sessionResult.value.data
+        : null;
+
+      const bridgeType = connection.bridgeType || 'unknown';
+      const connected = Boolean(connection.connected);
+
+      const health = {
+        status: connected ? 'ok' : 'degraded',
+        bridge: {
+          type: bridgeType,
+          connected,
+          stateFileAge: connection.stateFileAge || null
+        },
+        session: session ? {
+          projectName: session.projectName || session.name || '',
+          trackCount: session.trackCount || 0,
+          bpm: session.bpm || null,
+          sampleRate: session.sampleRate || null
+        } : null,
+        server: {
+          uptime: Math.floor(process.uptime()),
+          nodeVersion: process.version,
+          platform: process.platform
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      if (!connected) {
+        health.guidance = bridgeType === 'mock'
+          ? 'Running with mock bridge. Set USE_REAL_BRIDGE=1 and start REAPER with the Lua bridge script to connect to a real session.'
+          : 'REAPER bridge is not responding. Make sure REAPER is running and the Lua bridge script is active.';
+      }
+
+      res.json({ ok: true, data: health });
+    } catch (e) {
+      res.json({
+        ok: false,
+        data: {
+          status: 'error',
+          error: e.message,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+  });
+
   // GET /api/workflows - available workflows
   router.get('/api/workflows', (req, res) => {
     try {

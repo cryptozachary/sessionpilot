@@ -35,20 +35,33 @@ function secondsToBar(seconds, bpm) {
   return Math.max(1, Math.round(beats / 4) + 1);
 }
 
+function firstFiniteNumber(...values) {
+  for (const value of values) {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function buildSectionItem(item, source, timelineUnit, bpm) {
   if (!item || typeof item !== 'object') return null;
 
   const rawStart = item.start !== undefined ? item.start : item.position;
   const rawEnd = item.end !== undefined ? item.end : null;
 
-  let startBar = null;
-  let endBar = null;
+  let startBar = firstFiniteNumber(item.startBar, item.bar);
+  let endBar = firstFiniteNumber(item.endBar);
 
-  if (timelineUnit === 'bars') {
+  if (!Number.isFinite(startBar) && timelineUnit === 'bars') {
     if (Number.isFinite(rawStart)) startBar = Math.max(1, Math.round(rawStart));
-    if (Number.isFinite(rawEnd)) endBar = Math.max(startBar || 1, Math.round(rawEnd));
-  } else {
+  } else if (!Number.isFinite(startBar)) {
     startBar = secondsToBar(rawStart, bpm);
+  }
+
+  if (!Number.isFinite(endBar) && timelineUnit === 'bars') {
+    if (Number.isFinite(rawEnd)) endBar = Math.max(startBar || 1, Math.round(rawEnd));
+  } else if (!Number.isFinite(endBar)) {
     endBar = secondsToBar(rawEnd, bpm);
   }
 
@@ -88,6 +101,9 @@ function buildSections(markers, regions, context) {
       {
         name: marker.name,
         position: marker.position,
+        bar: marker.bar,
+        startBar: marker.startBar,
+        endBar: nextMarker ? firstFiniteNumber(nextMarker.startBar, nextMarker.bar) : null,
         end: nextMarker ? nextMarker.position : null
       },
       'marker_span',

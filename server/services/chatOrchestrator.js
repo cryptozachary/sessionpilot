@@ -33,6 +33,55 @@ function buildFallbackResponse() {
   });
 }
 
+function buildContextAwareFallback(contextSnapshot) {
+  const suggestions = [];
+  const connection = contextSnapshot.connection || {};
+  const tracks = contextSnapshot.tracks || [];
+  const selectedTrack = contextSnapshot.selectedTrack;
+  const sections = contextSnapshot.sections || [];
+
+  if (!connection.connected) {
+    return createAssistantResponse({
+      message: "It looks like REAPER isn't connected yet. Make sure REAPER is running with the bridge script active, then try again. In the meantime, I can answer general questions about session setup.",
+      proposedActions: [],
+      requiresConfirmation: false,
+      actionType: 'advice',
+      context: { route: 'context_fallback', intent: null }
+    });
+  }
+
+  if (tracks.length === 0) {
+    suggestions.push('Your session has no tracks yet. I can **create a vocal track** to get started.');
+  } else if (!selectedTrack) {
+    suggestions.push(`You have ${tracks.length} tracks but none selected. Select a track in REAPER and I can help with recording, comping, or organizing.`);
+  } else {
+    const trackName = selectedTrack.name || 'the selected track';
+    if (selectedTrack.isArmed) {
+      suggestions.push(`"${trackName}" is armed and ready. I can **set up a punch-in**, **start a loop record**, or **run a preflight check**.`);
+    } else {
+      suggestions.push(`"${trackName}" is selected. I can **arm it for recording**, **rename it**, **set up doubles and adlibs**, or **comp its takes**.`);
+    }
+  }
+
+  if (sections.length > 0) {
+    suggestions.push('I see song sections marked. I can **set up a punch for a specific section** like "punch the chorus".');
+  } else if (tracks.length > 0) {
+    suggestions.push('No song sections marked yet. I can **mark your song structure** if you tell me where the verse, chorus, and bridge are.');
+  }
+
+  const fallbackMessage = suggestions.length > 0
+    ? `I didn't quite catch that. Here's what I can help with right now:\n\n${suggestions.join('\n\n')}`
+    : aiOrchestrator.DEFAULT_FALLBACK_MESSAGE;
+
+  return createAssistantResponse({
+    message: fallbackMessage,
+    proposedActions: [],
+    requiresConfirmation: false,
+    actionType: 'advice',
+    context: { route: 'context_fallback', intent: null }
+  });
+}
+
 function buildDirectActionLabel(actionType, args = {}) {
   switch (actionType) {
     case 'selectTrack':
@@ -64,7 +113,7 @@ function buildDirectActionDescription(actionType, args = {}) {
 
 async function buildPlannerResponse(bridge, plan) {
   if (!plan) {
-    return buildFallbackResponse();
+    return null;
   }
 
   if (plan.kind === 'workflow') {
@@ -169,7 +218,7 @@ module.exports = {
     } else if (matchedIntent) {
       response = await aiOrchestrator.processMessage(bridge, message, { matchedIntent });
     } else {
-      response = plannerResponse || buildFallbackResponse();
+      response = plannerResponse || buildContextAwareFallback(contextSnapshot);
     }
 
     response.context = {

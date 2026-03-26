@@ -27,7 +27,7 @@ const INTENT_PATTERNS = [
     intent: 'prepare_punch_in', workflow: 'preparePunchIn', actionType: 'safe_action'
   },
   {
-    patterns: [/organize.*track/i, /clean\s*up.*session/i, /folder.*track/i, /sort.*track/i],
+    patterns: [/organize.*track/i, /organize.*session/i, /clean\s*up.*session/i, /folder.*track/i, /sort.*track/i],
     intent: 'organize_session', workflow: 'organizeSessionTracks', actionType: 'needs_confirmation'
   },
   {
@@ -53,7 +53,7 @@ const INTENT_PATTERNS = [
 
   // Comp takes
   {
-    patterns: [/comp/i, /best\s*take/i, /pick.*take/i, /choose.*take/i, /review.*take/i, /which\s*take/i, /takes?\s*(on|for)/i],
+    patterns: [/comp/i, /best\s*take/i, /pick.*take/i, /choose.*take/i, /review.*take/i, /which\s*take/i, /takes?\s*(on|for)/i, /show.*takes?/i],
     intent: 'comp_takes', workflow: 'compTakes', actionType: 'safe_action'
   },
 
@@ -65,7 +65,7 @@ const INTENT_PATTERNS = [
 
   // Mark song structure
   {
-    patterns: [/mark.*structure/i, /song\s*structure/i, /section.*marker/i, /verse.*chorus/i, /mark.*verse/i, /mark.*chorus/i, /mark.*bridge/i, /map.*song/i],
+    patterns: [/mark.*structure/i, /song\s*structure/i, /section.*marker/i, /mark.*sections?/i, /verse.*chorus/i, /mark.*verse/i, /mark.*chorus/i, /mark.*bridge/i, /map.*song/i],
     intent: 'mark_song_structure', workflow: 'markSongStructure', actionType: 'safe_action'
   },
 

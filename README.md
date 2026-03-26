@@ -53,23 +53,28 @@ npm start
   - `modules/` - State management, API client, WebSocket client
 - `reaper/` - REAPER Lua bridge script
 
-## Replacing the Mock Bridge
+## Environment Variables
 
-The app ships with `MockReaperBridge` for development. To connect to a real REAPER instance:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `USE_REAL_BRIDGE` | `0` | Set to `1` to use the JSON queue bridge with a real REAPER instance |
+| `REAPER_BRIDGE_DIR` | `./reaper_bridge` | Path to the bridge directory (commands/results/state.json) |
+| `ANTHROPIC_API_KEY` | (none) | Optional. Enables Claude LLM fallback for ambiguous messages |
+| `SESSIONPILOT_PLANNER_MODE` | `heuristic` | `heuristic` (default), `heuristic-only` (no LLM), or `off` |
+| `PORT` | `3000` | Server port |
 
-### Option 1: JSON Queue Bridge
+## Connecting to REAPER
+
+The app defaults to `MockReaperBridge` for easy first-run. To connect to a real REAPER instance:
+
+### JSON Queue Bridge
 
 1. Copy `reaper/SessionPilotBridge.lua` into your REAPER Scripts folder
 2. Load and run the script in REAPER (Actions > Load ReaScript)
-3. In `server/index.js`, switch from `MockReaperBridge` to `JsonQueueReaperBridge`:
+3. Start the server with the real bridge:
 
-```js
-const JsonQueueReaperBridge = require('./bridge/JsonQueueReaperBridge');
-const bridge = new JsonQueueReaperBridge({
-  commandDir: './reaper_bridge/commands',
-  resultDir: './reaper_bridge/results',
-  stateFile: './reaper_bridge/state.json'
-});
+```bash
+USE_REAL_BRIDGE=1 npm start
 ```
 
 ### Option 2: Custom Bridge
@@ -80,6 +85,7 @@ Extend `ReaperBridge` base class and implement all methods. The bridge contract 
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | /api/health | Health check with bridge status and system info |
 | GET | /api/session | Project summary |
 | GET | /api/tracks | All tracks |
 | GET | /api/selected-track | Currently selected track |

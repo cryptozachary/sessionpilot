@@ -346,6 +346,23 @@ local function barToTime(bar)
 end
 
 ---------------------------------------------------------------------------
+-- Utility: convert a time position into a 1-based bar number
+---------------------------------------------------------------------------
+local function timeToBar(timePos)
+  if timePos == nil then return nil end
+
+  local _, measures = reaper.TimeMap2_timeToBeats(0, timePos)
+  if measures ~= nil then
+    return math.floor(measures) + 1
+  end
+
+  local bpm, _ = reaper.GetProjectTimeSignature2(0)
+  if bpm == 0 then bpm = 120 end
+  local beats = (timePos * bpm) / 60
+  return math.max(1, math.floor(beats / 4) + 1)
+end
+
+---------------------------------------------------------------------------
 -- Get project summary
 ---------------------------------------------------------------------------
 local function getProjectSummary()
@@ -374,6 +391,7 @@ local function getProjectSummary()
     bpm = bpm,
     transportState = transportLookup[playState] or "unknown",
     playCursor = cursor,
+    playCursorBar = timeToBar(cursor),
     recordMode = "normal",
     trackCount = trackCount,
     markerCount = numMarkers,
@@ -473,13 +491,16 @@ local function getMarkersAndRegions()
           id = idx,
           name = name,
           start = pos,
-          ["end"] = rgnEnd
+          ["end"] = rgnEnd,
+          startBar = timeToBar(pos),
+          endBar = timeToBar(rgnEnd)
         })
       else
         table.insert(result.markers, {
           id = idx,
           name = name,
-          position = pos
+          position = pos,
+          bar = timeToBar(pos)
         })
       end
     end
@@ -520,6 +541,7 @@ commands.getTransportState = function(args)
     data = {
       state = summary.transportState,
       playCursor = summary.playCursor,
+      playCursorBar = summary.playCursorBar,
       bpm = summary.bpm,
       recordMode = summary.recordMode
     }
@@ -685,7 +707,15 @@ commands.insertMarker = function(args)
     pos = reaper.GetCursorPosition()
   end
   local idx = reaper.AddProjectMarker(0, false, pos, 0, args.name or "", -1)
-  return { ok = true, data = { markerId = idx, position = pos, name = args.name } }
+  return {
+    ok = true,
+    data = {
+      markerId = idx,
+      position = pos,
+      bar = timeToBar(pos),
+      name = args.name
+    }
+  }
 end
 
 commands.createRegion = function(args)
@@ -704,6 +734,8 @@ commands.createRegion = function(args)
       regionId = idx,
       start = startPos,
       ["end"] = endPos,
+      startBar = timeToBar(startPos),
+      endBar = timeToBar(endPos),
       name = args.name
     }
   }
@@ -1073,6 +1105,7 @@ local function writeStateSnapshot()
     bpm = summary.bpm,
     transportState = summary.transportState,
     playCursor = summary.playCursor,
+    playCursorBar = summary.playCursorBar,
     recordMode = summary.recordMode,
     trackCount = summary.trackCount,
     markerCount = summary.markerCount,

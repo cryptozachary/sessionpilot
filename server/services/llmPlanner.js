@@ -1,5 +1,13 @@
 const { PLAN_KINDS, validatePlan } = require('./plannerSchema');
 
+// LLM integration (optional — requires ANTHROPIC_API_KEY env var and @anthropic-ai/sdk)
+let Anthropic = null;
+try {
+  Anthropic = require('@anthropic-ai/sdk');
+} catch (_e) {
+  // SDK not installed — LLM features unavailable, heuristic-only mode
+}
+
 const ORDINAL_WORDS = {
   first: 1,
   one: 1,
@@ -237,6 +245,77 @@ function planSectionPunchRequest(message, context) {
   });
 }
 
+const LLM_SYSTEM_PROMPT = `You are a REAPER DAW session assistant classifier. Classify the user's message into one of these action types.
+
+WORKFLOWS (return kind: "workflow"):
+- setupLeadVocal: Set up a lead vocal track for recording
+- setupLeadDoubleAdlib: Set up lead, doubles, and adlib tracks
+- preparePunchIn: Prepare a punch-in recording (args: startBar, endBar)
+- quickPunchLoop: Set up loop punch recording (args: startBar, endBar, preRollBeats)
+- organizeSessionTracks: Organize/clean up session tracks into folders
+- colorCodeVocals: Color code vocal tracks for visual clarity
+- diagnoseMonitoringIssue: Help with monitoring/hearing problems
+- diagnoseLowInputIssue: Help with low input levels or gain
+- setupHeadphoneMix: Set up headphone/cue mix with reverb
+- compTakes: Review and comp takes on a track
+- roughMix: Create a rough mix with panning and levels
+- markSongStructure: Mark song sections with markers (args: sections array)
+- sessionNotes: Add session notes or bookmarks (args: note text)
+- preflightCheck: Pre-session readiness check
+
+DIRECT ACTIONS (return kind: "direct_action"):
+- armTrack: Arm a track for recording
+- disarmTrack: Disarm a track
+- renameTrack: Rename a track (args: name)
+- createTrack: Create a new track (args: name)
+- duplicateTrack: Duplicate selected track
+- insertMarker: Insert a marker (args: name)
+- selectTrack: Select a track
+
+ADVICE (return kind: "advice"): For general recording questions, technique tips, or greetings.
+CLARIFICATION (return kind: "clarification"): When the request is too ambiguous to act on.
+
+Respond with ONLY valid JSON:
+{"kind":"...","workflow":"...","actionType":"...","args":{},"message":"natural response","confidence":0.0-1.0,"requiresConfirmation":false}
+
+Omit workflow/actionType fields when not applicable. Keep message under 200 chars.`;
+
+async function planWithLLM(message, context) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || !Anthropic) {
+    return null;
+  }
+
+  const tracks = (context.tracks || []).map(t => t.name).join(', ');
+  const selectedTrack = context.selectedTrack ? context.selectedTrack.name : 'none';
+  const sections = (context.sections || [])
+    .map(s => `${s.name} (bars ${s.startBar}-${s.endBar})`)
+    .join(', ');
+  const session = context.session || {};
+
+  const contextLine = `Session: "${session.projectName || 'Untitled'}" | ${(context.tracks || []).length} tracks [${tracks}] | Selected: ${selectedTrack} | Sections: ${sections || 'none'} | BPM: ${session.bpm || '?'}`;
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 300,
+      system: LLM_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: `${contextLine}\n\nUser: ${message}` }]
+    });
+
+    const text = (response.content[0].text || '').trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return finalizePlan(parsed);
+  } catch (err) {
+    console.error('LLM planner error:', err.message);
+    return null;
+  }
+}
+
 async function plan({ message, context, memory }) {
   const mode = (process.env.SESSIONPILOT_PLANNER_MODE || 'heuristic').toLowerCase();
   if (mode === 'off') {
@@ -251,6 +330,14 @@ async function plan({ message, context, memory }) {
   const sectionPlan = planSectionPunchRequest(message, context);
   if (sectionPlan) {
     return sectionPlan;
+  }
+
+  // LLM fallback — only when heuristics cannot classify and API key is available
+  if (mode !== 'heuristic-only') {
+    const llmPlan = await planWithLLM(message, context);
+    if (llmPlan) {
+      return llmPlan;
+    }
   }
 
   return null;

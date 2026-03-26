@@ -181,6 +181,12 @@ class JsonQueueReaperBridge extends ReaperBridge {
       bpm: projectSummary.bpm || 120,
       transportState: projectSummary.transportState || state.transportState || 'stopped',
       playCursor: projectSummary.playCursor || state.playCursor || 0,
+      playCursorBar:
+        projectSummary.playCursorBar !== undefined
+          ? projectSummary.playCursorBar
+          : state.playCursorBar !== undefined
+            ? state.playCursorBar
+            : null,
       recordMode: projectSummary.recordMode || state.recordMode || 'normal',
       trackCount:
         projectSummary.trackCount !== undefined
@@ -271,6 +277,7 @@ class JsonQueueReaperBridge extends ReaperBridge {
           bpm: state.bpm || 120,
           transportState: state.transportState || 'stopped',
           playCursor: state.playCursor || 0,
+          playCursorBar: state.playCursorBar !== undefined ? state.playCursorBar : null,
           recordMode: state.recordMode || 'normal',
           trackCount: state.trackCount || 0,
           markerCount: state.markerCount || 0,
@@ -330,6 +337,7 @@ class JsonQueueReaperBridge extends ReaperBridge {
         {
           state: state.transportState || 'stopped',
           playCursor: state.playCursor || 0,
+          playCursorBar: state.playCursorBar !== undefined ? state.playCursorBar : null,
           bpm: state.bpm || 120,
           recordMode: state.recordMode || 'normal'
         },

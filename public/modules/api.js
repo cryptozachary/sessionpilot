@@ -29,6 +29,7 @@ window.SessionPilot.API = (() => {
     getTemplates:        () => request('GET', '/api/templates'),
     getFxChains:         () => request('GET', '/api/fx-chains'),
     getWorkflows:        () => request('GET', '/api/workflows'),
+    getHealth:     () => request('GET', '/api/health'),
     getActionLog: (limit = 50) => request('GET', `/api/action-log?limit=${limit}`),
 
     // Chat
