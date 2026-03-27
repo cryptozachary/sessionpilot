@@ -128,6 +128,21 @@ const INTENT_PATTERNS = [
     patterns: [/\bgo\s*to\s*bar\s*(\d+)\b/i, /\bjump\s*to\s*bar\s*(\d+)\b/i, /\bbar\s*(\d+)\b/i],
     intent: 'transport_goto_bar', actionType: 'safe_action'
   },
+  // Marker navigation ("go to chorus", "jump to verse 2")
+  {
+    patterns: [/\bgo\s*to\s*(the\s*)?(intro|verse|pre-?chorus|chorus|hook|bridge|outro|break|solo|interlude)/i, /\bjump\s*to\s*(the\s*)?(intro|verse|pre-?chorus|chorus|hook|bridge|outro|break|solo|interlude)/i, /\bgo\s*to\s*marker\s+/i, /\bjump\s*to\s*marker\s+/i],
+    intent: 'goto_marker', actionType: 'safe_action'
+  },
+
+  // Volume / pan controls
+  {
+    patterns: [/\b(turn|set|bring)\s*(up|down)\s*(the\s*)?(volume|level|fader)/i, /\bvolume\b.*\b(up|down|\d)/i, /\b(louder|quieter|softer)\b/i, /\bset\s*(the\s*)?volume\b/i],
+    intent: 'set_volume', actionType: 'safe_action'
+  },
+  {
+    patterns: [/\bpan\s*(left|right|center|centre|\d)/i, /\bset\s*(the\s*)?pan\b/i, /\bpan\s*(it|the|this)/i],
+    intent: 'set_pan', actionType: 'safe_action'
+  },
 
   // Undo / redo
   { patterns: [/\bundo\b/i, /take\s*(that|it)\s*back/i, /reverse\s*(that|last)/i], intent: 'undo', actionType: 'safe_action' },
@@ -176,7 +191,12 @@ function extractArgs(message, intent) {
       // Parse bar numbers from "bars X to Y" or "bar X-Y"
       const rangeMatch = message.match(/bars?\s*(\d+)\s*(?:to|-)\s*(\d+)/i);
       if (rangeMatch) {
-        return { startBar: parseInt(rangeMatch[1], 10), endBar: parseInt(rangeMatch[2], 10) };
+        let startBar = parseInt(rangeMatch[1], 10);
+        let endBar = parseInt(rangeMatch[2], 10);
+        if (startBar < 1) startBar = 1;
+        if (endBar < 1) endBar = 1;
+        if (startBar > endBar) { const tmp = startBar; startBar = endBar; endBar = tmp; }
+        return { startBar, endBar };
       }
       const singleMatch = message.match(/bar\s*(\d+)/i);
       if (singleMatch) {
@@ -244,6 +264,9 @@ function extractArgs(message, intent) {
       if (rangeMatch) {
         args.startBar = parseInt(rangeMatch[1], 10);
         args.endBar = parseInt(rangeMatch[2], 10);
+        if (args.startBar < 1) args.startBar = 1;
+        if (args.endBar < 1) args.endBar = 1;
+        if (args.startBar > args.endBar) { const tmp = args.startBar; args.startBar = args.endBar; args.endBar = tmp; }
       } else {
         const singleMatch = message.match(/bar\s*(\d+)/i);
         if (singleMatch) {
@@ -256,6 +279,32 @@ function extractArgs(message, intent) {
         args.preRollBeats = parseInt(preRollMatch[1] || preRollMatch[2], 10);
       }
       return args;
+    }
+
+    case 'set_volume': {
+      // Parse volume like "volume 80%", "volume to 0.5", "turn up", "louder"
+      const pctMatch = message.match(/(\d+)\s*%/);
+      if (pctMatch) return { volume: parseInt(pctMatch[1], 10) / 100 };
+      const numMatch = message.match(/volume\s*(?:to\s*)?(\d+(?:\.\d+)?)/i);
+      if (numMatch) return { volume: parseFloat(numMatch[1]) };
+      if (/\b(up|louder)\b/i.test(message)) return { volumeDelta: 0.1 };
+      if (/\b(down|quieter|softer)\b/i.test(message)) return { volumeDelta: -0.1 };
+      return {};
+    }
+
+    case 'set_pan': {
+      // Parse pan like "pan left", "pan right", "pan center", "pan -0.5", "pan 50% left"
+      const pctPanMatch = message.match(/(\d+)\s*%?\s*(left|right)/i);
+      if (pctPanMatch) {
+        const val = parseInt(pctPanMatch[1], 10) / 100;
+        return { pan: pctPanMatch[2].toLowerCase() === 'left' ? -val : val };
+      }
+      if (/\bcenter\b|\bcentre\b|\bmiddle\b/i.test(message)) return { pan: 0 };
+      if (/\bleft\b/i.test(message)) return { pan: -1.0 };
+      if (/\bright\b/i.test(message)) return { pan: 1.0 };
+      const numPan = message.match(/pan\s*(?:to\s*)?(-?\d+(?:\.\d+)?)/i);
+      if (numPan) return { pan: parseFloat(numPan[1]) };
+      return {};
     }
 
     case 'transport_play':
@@ -276,6 +325,18 @@ function extractArgs(message, intent) {
     case 'transport_goto_bar': {
       const barMatch = message.match(/bar\s*(\d+)/i);
       if (barMatch) return { bar: parseInt(barMatch[1], 10) };
+      return {};
+    }
+
+    case 'goto_marker': {
+      // Extract marker/section name like "go to chorus", "go to verse 2", "go to marker Bridge"
+      const sectionMatch = message.match(/(?:go|jump)\s*to\s*(?:the\s*)?(intro|verse|pre-?chorus|chorus|hook|bridge|outro|break|solo|interlude)(?:\s*(\d+))?/i);
+      if (sectionMatch) {
+        const name = sectionMatch[2] ? `${sectionMatch[1]} ${sectionMatch[2]}` : sectionMatch[1];
+        return { name };
+      }
+      const markerMatch = message.match(/(?:go|jump)\s*to\s*marker\s+["']?(.+?)["']?\s*$/i);
+      if (markerMatch) return { name: markerMatch[1].trim() };
       return {};
     }
 
@@ -521,6 +582,75 @@ async function handleDirectAction(bridge, matched, message) {
           type: 'goToPosition',
           args: { bar },
           label: `Go to bar ${bar}`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'goto_marker': {
+      if (!args.name) {
+        return buildResponse("Which marker or section? Say something like \"go to chorus\" or \"go to verse 2\".", [], 'advice', baseContext);
+      }
+      return buildResponse(
+        `Navigating to "${args.name}".`,
+        [{
+          type: 'goToMarker',
+          args: { name: args.name },
+          label: `Go to "${args.name}"`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'set_volume': {
+      const selected = await bridge.getSelectedTrack();
+      if (!selected.ok || !selected.data) {
+        return buildResponse("Select a track first to adjust its volume.", [], 'advice', baseContext);
+      }
+      const trackName = selected.data.name || 'Track ' + selected.data.index;
+      let targetVolume = args.volume;
+      if (targetVolume === undefined && args.volumeDelta !== undefined) {
+        const currentVol = selected.data.volume !== undefined ? selected.data.volume : 1.0;
+        targetVolume = Math.max(0, Math.min(2.0, currentVol + args.volumeDelta));
+      }
+      if (targetVolume === undefined) {
+        return buildResponse("What volume level? Say something like \"volume 80%\" or \"turn up\".", [], 'advice', baseContext);
+      }
+      const pctDisplay = Math.round(targetVolume * 100);
+      return buildResponse(
+        `Setting "${trackName}" volume to ${pctDisplay}%.`,
+        [{
+          type: 'setTrackVolume',
+          args: { trackIndex: selected.data.index, volume: targetVolume },
+          label: `Set "${trackName}" volume to ${pctDisplay}%`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'set_pan': {
+      const selected = await bridge.getSelectedTrack();
+      if (!selected.ok || !selected.data) {
+        return buildResponse("Select a track first to adjust its pan.", [], 'advice', baseContext);
+      }
+      const trackName = selected.data.name || 'Track ' + selected.data.index;
+      const panVal = args.pan;
+      if (panVal === undefined) {
+        return buildResponse("Which direction? Say \"pan left\", \"pan right\", or \"pan center\".", [], 'advice', baseContext);
+      }
+      const panLabel = panVal === 0 ? 'center' : panVal < 0 ? `${Math.round(Math.abs(panVal) * 100)}% left` : `${Math.round(panVal * 100)}% right`;
+      return buildResponse(
+        `Panning "${trackName}" ${panLabel}.`,
+        [{
+          type: 'setTrackPan',
+          args: { trackIndex: selected.data.index, pan: panVal },
+          label: `Pan "${trackName}" ${panLabel}`,
           requiresConfirmation: false
         }],
         matched.actionType,

@@ -238,10 +238,12 @@ window.SessionPilot.VoiceRouter = (() => {
   function extractBarRange(text) {
     const range = text.match(/bars?\s*(\d+)\s*(?:to|-|through)\s*(\d+)/i);
     if (range) {
-      return {
-        startBar: parseInt(range[1], 10),
-        endBar: parseInt(range[2], 10)
-      };
+      let startBar = parseInt(range[1], 10);
+      let endBar = parseInt(range[2], 10);
+      if (startBar < 1) startBar = 1;
+      if (endBar < 1) endBar = 1;
+      if (startBar > endBar) { const tmp = startBar; startBar = endBar; endBar = tmp; }
+      return { startBar, endBar };
     }
 
     return null;
@@ -371,6 +373,56 @@ window.SessionPilot.VoiceRouter = (() => {
       });
     }
 
+    // --- Volume / Pan controls ---
+    if (/\bvolume\b|\blouder\b|\bquieter\b|\bsofter\b|\bturn (up|down)\b|\bfader\b/.test(text)) {
+      const pctMatch = text.match(/(\d+)\s*%/);
+      let volume;
+      if (pctMatch) {
+        volume = parseInt(pctMatch[1], 10) / 100;
+      } else if (/\b(up|louder)\b/.test(text)) {
+        const sel = getSelectedTrack();
+        volume = Math.min(2.0, ((sel && sel.volume) || 1.0) + 0.1);
+      } else if (/\b(down|quieter|softer)\b/.test(text)) {
+        const sel = getSelectedTrack();
+        volume = Math.max(0, ((sel && sel.volume) || 1.0) - 0.1);
+      }
+      if (volume !== undefined) {
+        const sel = getSelectedTrack();
+        if (!sel) return { kind: 'handled', reply: 'Select a track first to adjust volume.' };
+        const pct = Math.round(volume * 100);
+        return {
+          kind: 'execute',
+          pending: makePendingAction('setTrackVolume', { trackId: sel.id, volume }, `Set "${sel.name}" volume to ${pct}%`),
+          successMessage: `Set "${sel.name}" volume to ${pct}%.`
+        };
+      }
+    }
+
+    if (/\bpan\b/.test(text)) {
+      let pan;
+      const pctPanMatch = text.match(/(\d+)\s*%?\s*(left|right)/);
+      if (pctPanMatch) {
+        const val = parseInt(pctPanMatch[1], 10) / 100;
+        pan = pctPanMatch[2] === 'left' ? -val : val;
+      } else if (/\bcenter\b|\bcentre\b|\bmiddle\b/.test(text)) {
+        pan = 0;
+      } else if (/\bleft\b/.test(text)) {
+        pan = -1.0;
+      } else if (/\bright\b/.test(text)) {
+        pan = 1.0;
+      }
+      if (pan !== undefined) {
+        const sel = getSelectedTrack();
+        if (!sel) return { kind: 'handled', reply: 'Select a track first to adjust pan.' };
+        const panLabel = pan === 0 ? 'center' : pan < 0 ? `${Math.round(Math.abs(pan) * 100)}% left` : `${Math.round(pan * 100)}% right`;
+        return {
+          kind: 'execute',
+          pending: makePendingAction('setTrackPan', { trackId: sel.id, pan }, `Pan "${sel.name}" ${panLabel}`),
+          successMessage: `Panned "${sel.name}" ${panLabel}.`
+        };
+      }
+    }
+
     if (/^(duplicate|copy)\b/.test(text)) {
       return routeTrackControl(text, {
         pattern: /^(duplicate|copy)\b/,
@@ -456,6 +508,31 @@ window.SessionPilot.VoiceRouter = (() => {
         pending: makePendingAction('goToPosition', { bar }, `Go to bar ${bar}`),
         successMessage: `Cursor moved to bar ${bar}.`
       };
+    }
+
+    // --- Marker navigation ---
+    if (/\b(?:go|jump)\s*to\s*(?:the\s*)?(intro|verse|pre-?chorus|chorus|hook|bridge|outro|break|solo|interlude)/.test(text)) {
+      const sectionMatch = text.match(/(?:go|jump)\s*to\s*(?:the\s*)?(intro|verse|pre-?chorus|chorus|hook|bridge|outro|break|solo|interlude)(?:\s*(\d+))?/);
+      if (sectionMatch) {
+        const name = sectionMatch[2] ? `${sectionMatch[1]} ${sectionMatch[2]}` : sectionMatch[1];
+        return {
+          kind: 'execute',
+          pending: makePendingAction('goToMarker', { name }, `Go to "${name}"`),
+          successMessage: `Navigated to "${name}".`
+        };
+      }
+    }
+
+    if (/\b(?:go|jump)\s*to\s*marker\s+/.test(text)) {
+      const markerMatch = text.match(/(?:go|jump)\s*to\s*marker\s+(.+)/);
+      if (markerMatch) {
+        const name = markerMatch[1].trim();
+        return {
+          kind: 'execute',
+          pending: makePendingAction('goToMarker', { name }, `Go to marker "${name}"`),
+          successMessage: `Navigated to marker "${name}".`
+        };
+      }
     }
 
     if (/\b(marker|bookmark)\b/.test(text)) {

@@ -16,7 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ActionCards,
     ConfirmModal,
     ActionLog,
-    VoiceControl
+    VoiceControl,
+    KeyboardShortcuts,
+    HelpOverlay
   } = window.SessionPilot;
 
   // Initialize all UI components
@@ -29,6 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
   ConfirmModal.init();
   ActionLog.init();
   VoiceControl.init();
+  KeyboardShortcuts.init();
+  HelpOverlay.init();
+
+  // Help button
+  const helpBtn = document.getElementById('help-btn');
+  if (helpBtn) helpBtn.addEventListener('click', () => HelpOverlay.toggle());
 
   // Connect WebSocket for real-time updates
   WS.connect();

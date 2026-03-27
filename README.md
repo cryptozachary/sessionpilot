@@ -5,18 +5,25 @@ AI Recording Engineer Assistant for REAPER DAW. SessionPilot provides a natural 
 ## Features
 
 - Natural language recording assistant (text, voice, and quick-action buttons)
-- Transport controls (play, stop, record, pause, go-to-bar) from chat, voice, or UI
+- Transport controls (play, stop, record, pause, go-to-bar) from chat, voice, keyboard, or UI
+- Keyboard shortcuts for transport (Space, R, Home, End, Esc)
+- Volume and pan control via voice commands, chat, or UI sliders
 - Vocal session setup workflows (lead, doubles, adlibs, full stack)
 - Punch-in and loop-punch preparation with pre-roll
 - FX chain management (insert, remove, bypass plugins per track)
 - Batch recording setup (playlist-style multi-song sessions)
 - Export/bounce workflows (mix, stems, or both)
+- Marker navigation ("go to chorus", "jump to verse 2")
 - Undo/redo with history log
 - Monitoring and input level diagnostics
-- Track organization, color-coding, and rough mixing
+- Track organization with folder management, color-coding, and rough mixing
 - Comp takes review and selection
 - Song structure marking (verse/chorus/bridge markers and regions)
 - Action preview and confirmation for destructive operations
+- Transport-aware action gating (blocks destructive ops while recording)
+- Command chaining ("arm track then hit record")
+- Action queue for sequential command execution
+- Voice command help overlay (press ? or click help button)
 - Real-time session state display via WebSocket
 - Optional Claude LLM fallback for ambiguous messages
 - Context-aware fallback suggestions based on session state
@@ -34,13 +41,13 @@ npm start
 ```
 +----------------------------------------------------------------------+
 |                      Frontend (Vanilla JS)                            |
-|  Chat | Transport Bar | Voice Control | Quick Actions | Action Log   |
+|  Chat | Transport | Voice | Quick Actions | Shortcuts | Help Overlay  |
 +----------------------------------+-----------------------------------+
                                    | REST + WebSocket
 +----------------------------------+-----------------------------------+
 |                       Express Backend                                |
 |  Chat Orchestrator -> AI Orchestrator (regex) -> LLM Planner (Claude)|
-|  Workflow Service (17 workflows) | Action Routes (53+ bridge methods)|
+|  Workflow Service (17 workflows) | Action Routes (56+ bridge methods)|
 +----------------------------------+-----------------------------------+
                                    | Bridge Interface
 +----------------------------------+-----------------------------------+
@@ -161,14 +168,30 @@ These actions execute immediately without a workflow preview:
 |--------|-------------|
 | play, stop, pause, record | Transport controls |
 | goToPosition, goToStart, goToEnd | Cursor navigation (supports bar numbers) |
+| goToMarker | Navigate to a named marker or region ("chorus", "verse 2") |
 | armTrack, disarmTrack | Recording arm toggle |
 | toggleMonitoring | Input monitoring on/off |
 | muteTrack, soloTrack | Track mute/solo |
+| setTrackVolume, setTrackPan | Volume and pan control |
 | createTrack, renameTrack, duplicateTrack | Track management |
+| moveTrackToFolder | Move track into a folder track |
 | insertMarker, createRegion | Markers and regions |
 | undo, redo | Undo/redo history |
 | getTrackFx, removeFx, toggleFxBypass | FX management |
 | renderProject, renderStems | Rendering/export |
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| Space | Play / Pause toggle |
+| Escape | Stop transport |
+| R | Toggle recording |
+| Home | Go to start |
+| End | Go to end |
+| ? | Show help overlay |
+
+Shortcuts are active when the chat input is not focused.
 
 ## Voice Commands
 
@@ -176,10 +199,21 @@ With voice control enabled (Web Speech API), you can say:
 
 - "Hit play" / "Stop" / "Pause" / "Hit record" / "Roll tape"
 - "Go to start" / "From the top" / "Go to bar 16"
+- "Go to chorus" / "Go to verse 2" / "Jump to marker Bridge"
 - "Arm this track" / "Disarm" / "Solo" / "Mute"
+- "Volume up" / "Louder" / "Volume 80%" / "Turn down"
+- "Pan left" / "Pan right" / "Pan center" / "Pan 50% left"
 - "Set me up to record vocals" / "Punch loop bars 8 to 16"
 - "Preflight check" / "Rough mix" / "Comp takes"
 - "Undo" / "Redo"
+
+## Command Chaining
+
+You can chain multiple commands with "then":
+
+- "Arm track then hit record"
+- "Go to bar 8 then hit play"
+- "Stop then go to start"
 
 ## License
 

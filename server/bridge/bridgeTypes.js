@@ -78,6 +78,7 @@ const CONFIRMATION_POLICY = {
   toggleMonitoring: RISK_LEVELS.MEDIUM,
   duplicateTrack: RISK_LEVELS.MEDIUM,
   createFolderTrack: RISK_LEVELS.MEDIUM,
+  moveTrackToFolder: RISK_LEVELS.MEDIUM,
   createRegion: RISK_LEVELS.MEDIUM,
   loadTrackTemplate: RISK_LEVELS.MEDIUM,
   loadFxChain: RISK_LEVELS.MEDIUM,
@@ -104,6 +105,7 @@ const CONFIRMATION_POLICY = {
   goToPosition: RISK_LEVELS.LOW,
   goToStart: RISK_LEVELS.LOW,
   goToEnd: RISK_LEVELS.LOW,
+  goToMarker: RISK_LEVELS.LOW,
 
   // Undo / redo
   undo: RISK_LEVELS.LOW,

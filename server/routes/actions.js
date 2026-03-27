@@ -4,6 +4,15 @@
 const workflowService = require('../services/workflowService');
 const actionLog = require('../services/actionLog');
 
+// Actions/workflows that should be blocked while transport is recording
+const BLOCKED_WHILE_RECORDING = new Set([
+  'organizeSessionTracks', 'renderProject', 'renderStems', 'exportBounce',
+  'batchRecording', 'roughMix'
+]);
+const BLOCKED_ACTION_TYPES_WHILE_RECORDING = new Set([
+  'renderProject', 'renderStems'
+]);
+
 async function resolveTrackId(bridge, args = {}) {
   if (args.trackId) return args.trackId;
   if (args.trackIndex !== undefined && args.trackIndex !== null) {
@@ -101,6 +110,11 @@ const DIRECT_ACTION_MAP = {
   goToPosition: async (bridge, args) => bridge.goToPosition({ position: args.position, bar: args.bar }),
   goToStart: async (bridge) => bridge.goToStart(),
   goToEnd: async (bridge) => bridge.goToEnd(),
+  goToMarker: async (bridge, args) => bridge.goToMarker({ name: args.name }),
+  setTrackVolume: async (bridge, args) =>
+    bridge.setTrackVolume({ trackId: await resolveTrackId(bridge, args), volume: args.volume }),
+  setTrackPan: async (bridge, args) =>
+    bridge.setTrackPan({ trackId: await resolveTrackId(bridge, args), pan: args.pan }),
   undo: async (bridge) => bridge.undo(),
   redo: async (bridge) => bridge.redo(),
   getTrackFx: async (bridge, args) =>
@@ -127,6 +141,20 @@ module.exports = function createActionRoutes(bridge) {
   router.post('/api/actions/execute', async (req, res) => {
     try {
       const { workflow, actionType, args = {}, confirmed } = req.body;
+
+      // Transport-aware gating: block destructive ops while recording
+      try {
+        const transport = await bridge.getTransportState();
+        const isRecording = transport.ok && transport.data && transport.data.state === 'recording';
+        if (isRecording) {
+          if (workflow && BLOCKED_WHILE_RECORDING.has(workflow)) {
+            return res.json({ ok: false, error: `Cannot run "${workflow}" while recording. Stop recording first.` });
+          }
+          if (actionType && BLOCKED_ACTION_TYPES_WHILE_RECORDING.has(actionType)) {
+            return res.json({ ok: false, error: `Cannot run "${actionType}" while recording. Stop recording first.` });
+          }
+        }
+      } catch (_e) { /* non-fatal: proceed if transport check fails */ }
 
       // Workflow execution
       if (workflow) {

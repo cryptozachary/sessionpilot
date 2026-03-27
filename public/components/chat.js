@@ -148,6 +148,14 @@ window.SessionPilot.Chat = (() => {
     return sendQueue;
   }
 
+  function splitChainedCommands(message) {
+    // Split on " then ", " and then ", ", then " for sequential commands
+    return message
+      .split(/\s*(?:,\s*)?(?:\band\b\s+)?then\s+/i)
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
   function handleSend() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
@@ -155,7 +163,21 @@ window.SessionPilot.Chat = (() => {
 
     input.value = '';
     input.focus();
-    queueMessage(message, { source: 'text' }).catch(() => null);
+
+    const parts = splitChainedCommands(message);
+    if (parts.length > 1) {
+      // Show user's full message, then queue each part sequentially
+      State().addChatMessage('user', message, { source: 'text' });
+      let chain = Promise.resolve();
+      for (const part of parts) {
+        chain = chain
+          .catch(() => null)
+          .then(() => sendMessage(part, { source: 'text', echoUser: false }));
+      }
+      chain.catch(() => null);
+    } else {
+      queueMessage(message, { source: 'text' }).catch(() => null);
+    }
   }
 
   function init() {

@@ -563,6 +563,19 @@ class MockReaperBridge extends ReaperBridge {
     });
   }
 
+  async moveTrackToFolder({ trackId, folderId }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+    const folder = this._findTrack(folderId);
+    if (!folder) return this._trackNotFound(folderId);
+
+    track.parentTrackId = folderId;
+    return this._result(true, { trackId, folderId, trackName: track.name, folderName: folder.name }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Sends / Routing
   // ---------------------------------------------------------------------------
@@ -908,6 +921,29 @@ class MockReaperBridge extends ReaperBridge {
     const region = { id: uuidv4(), start, end, name };
     this._regions.push(region);
     return this._result(true, region, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  async goToMarker({ name }) {
+    await this._simulateLatency();
+    const searchName = (name || '').toLowerCase();
+    const marker = this._markers.find(m => (m.name || '').toLowerCase().includes(searchName));
+    if (!marker) {
+      // Also check regions
+      const region = this._regions.find(r => (r.name || '').toLowerCase().includes(searchName));
+      if (!region) {
+        return this._result(false, null, [], [`No marker or region found matching "${name}"`], {
+          bridgeType: BRIDGE_TYPES.MOCK
+        });
+      }
+      this._playCursor = region.start;
+      return this._result(true, { position: region.start, name: region.name, type: 'region' }, [], [], {
+        bridgeType: BRIDGE_TYPES.MOCK
+      });
+    }
+    this._playCursor = marker.position;
+    return this._result(true, { position: marker.position, name: marker.name, type: 'marker' }, [], [], {
       bridgeType: BRIDGE_TYPES.MOCK
     });
   }

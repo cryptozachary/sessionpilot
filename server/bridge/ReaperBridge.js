@@ -196,6 +196,17 @@ class ReaperBridge {
     throw new Error('Not implemented: createFolderTrack');
   }
 
+  /**
+   * Moves a track into a folder track.
+   * @param {Object} params
+   * @param {string} params.trackId - Track to move
+   * @param {string} params.folderId - Target folder track ID
+   * @returns {Promise<Object>} BridgeResult
+   */
+  async moveTrackToFolder({ trackId, folderId }) {
+    throw new Error('Not implemented: moveTrackToFolder');
+  }
+
   // ---------------------------------------------------------------------------
   // Markers
   // ---------------------------------------------------------------------------
@@ -221,6 +232,16 @@ class ReaperBridge {
    */
   async createRegion({ start, end, name }) {
     throw new Error('Not implemented: createRegion');
+  }
+
+  /**
+   * Navigates to a marker by name (finds it and moves cursor to its position).
+   * @param {Object} params
+   * @param {string} params.name - Marker name to navigate to
+   * @returns {Promise<Object>} BridgeResult with marker position
+   */
+  async goToMarker({ name }) {
+    throw new Error('Not implemented: goToMarker');
   }
 
   // ---------------------------------------------------------------------------

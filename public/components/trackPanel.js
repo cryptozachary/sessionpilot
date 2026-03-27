@@ -2,6 +2,7 @@ window.SessionPilot = window.SessionPilot || {};
 
 window.SessionPilot.TrackPanel = (() => {
   const State = () => window.SessionPilot.State;
+  const API = () => window.SessionPilot.API;
 
   function render(track) {
     const container = document.getElementById('selected-track-panel');
@@ -56,13 +57,15 @@ window.SessionPilot.TrackPanel = (() => {
             <span class="track-detail-label">Items</span>
             <span class="track-detail-value">${itemCount}</span>
           </div>
-          <div class="track-detail-row">
+          <div class="track-detail-row track-slider-row">
             <span class="track-detail-label">Volume</span>
-            <span class="track-detail-value">${track.volume != null ? track.volume.toFixed(1) + ' dB' : '0.0 dB'}</span>
+            <input type="range" class="track-slider track-volume-slider" min="0" max="200" value="${Math.round((track.volume != null ? track.volume : 1.0) * 100)}" data-track-id="${track.id}">
+            <span class="track-slider-value">${Math.round((track.volume != null ? track.volume : 1.0) * 100)}%</span>
           </div>
-          <div class="track-detail-row">
+          <div class="track-detail-row track-slider-row">
             <span class="track-detail-label">Pan</span>
-            <span class="track-detail-value">${formatPan(track.pan)}</span>
+            <input type="range" class="track-slider track-pan-slider" min="-100" max="100" value="${Math.round((track.pan || 0) * 100)}" data-track-id="${track.id}">
+            <span class="track-slider-value">${formatPan(track.pan)}</span>
           </div>
         </div>
 
@@ -81,6 +84,44 @@ window.SessionPilot.TrackPanel = (() => {
         `}
       </div>
     `;
+
+    // Bind volume slider
+    const volSlider = container.querySelector('.track-volume-slider');
+    if (volSlider) {
+      let volTimeout;
+      volSlider.addEventListener('input', () => {
+        const val = parseInt(volSlider.value, 10);
+        volSlider.nextElementSibling.textContent = val + '%';
+      });
+      volSlider.addEventListener('change', () => {
+        clearTimeout(volTimeout);
+        volTimeout = setTimeout(async () => {
+          const volume = parseInt(volSlider.value, 10) / 100;
+          try {
+            await API().executeAction({ actionType: 'setTrackVolume', args: { trackId: volSlider.dataset.trackId, volume }, confirmed: true });
+          } catch (e) { console.error('Volume change failed:', e); }
+        }, 100);
+      });
+    }
+
+    // Bind pan slider
+    const panSlider = container.querySelector('.track-pan-slider');
+    if (panSlider) {
+      let panTimeout;
+      panSlider.addEventListener('input', () => {
+        const val = parseInt(panSlider.value, 10) / 100;
+        panSlider.nextElementSibling.textContent = formatPan(val);
+      });
+      panSlider.addEventListener('change', () => {
+        clearTimeout(panTimeout);
+        panTimeout = setTimeout(async () => {
+          const pan = parseInt(panSlider.value, 10) / 100;
+          try {
+            await API().executeAction({ actionType: 'setTrackPan', args: { trackId: panSlider.dataset.trackId, pan }, confirmed: true });
+          } catch (e) { console.error('Pan change failed:', e); }
+        }, 100);
+      });
+    }
   }
 
   function formatPan(pan) {

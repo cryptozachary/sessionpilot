@@ -135,17 +135,27 @@ module.exports = {
       currentBar = endBar + gapBars + 1;
     }
 
-    // Navigate to first song if requested
+    // Navigate to target song if requested
     if (args.navigateTo) {
-      const targetSong = songs.find(s => (s.name || s) === args.navigateTo);
-      if (targetSong) {
-        try {
-          const startTime = barToSeconds(1, bpm);
-          await bridge.setTimeSelection({ start: startTime, end: startTime + 10 });
-          executedActions.push({ action: 'navigateToSong', song: args.navigateTo });
-        } catch (err) {
-          executedActions.push({ action: 'navigateToSong', note: 'Failed: ' + err.message });
+      const targetName = args.navigateTo;
+      // Recalculate the start bar for the target song
+      let navBar = 1;
+      let navCurrentBar = 1;
+      for (const song of songs) {
+        const name = song.name || song;
+        if (name === targetName) {
+          navBar = navCurrentBar;
+          break;
         }
+        navCurrentBar += songLengthBars + gapBars;
+      }
+      try {
+        const startTime = barToSeconds(navBar, bpm);
+        await bridge.setTimeSelection({ start: startTime, end: startTime + 10 });
+        await bridge.goToPosition({ position: startTime });
+        executedActions.push({ action: 'navigateToSong', song: targetName, bar: navBar });
+      } catch (err) {
+        executedActions.push({ action: 'navigateToSong', note: 'Failed: ' + err.message });
       }
     }
 

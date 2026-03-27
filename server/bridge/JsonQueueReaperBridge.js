@@ -402,6 +402,10 @@ class JsonQueueReaperBridge extends ReaperBridge {
     return this._sendCommand('createFolderTrack', { name, color });
   }
 
+  async moveTrackToFolder({ trackId, folderId }) {
+    return this._sendCommand('moveTrackToFolder', { trackId, folderId });
+  }
+
   // ---------------------------------------------------------------------------
   // Markers
   // ---------------------------------------------------------------------------
@@ -412,6 +416,10 @@ class JsonQueueReaperBridge extends ReaperBridge {
 
   async createRegion({ start, end, name, startBar, endBar }) {
     return this._sendCommand('createRegion', { start, end, name, startBar, endBar });
+  }
+
+  async goToMarker({ name }) {
+    return this._sendCommand('goToMarker', { name });
   }
 
   // ---------------------------------------------------------------------------

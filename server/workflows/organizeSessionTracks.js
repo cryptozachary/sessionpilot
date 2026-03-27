@@ -111,16 +111,22 @@ module.exports = {
 
     if (vocalTracks.length > 0) {
       const vocalFolderResult = await bridge.createFolderTrack({ name: 'Vocals', color: VOCAL_COLOR });
-      const vocalFolderId = vocalFolderResult.data;
+      const vocalFolderId = vocalFolderResult.data && vocalFolderResult.data.id;
       for (const track of vocalTracks) {
+        if (vocalFolderId) {
+          await bridge.moveTrackToFolder({ trackId: track.id, folderId: vocalFolderId });
+        }
         await bridge.setTrackColor({ trackId: track.id, color: VOCAL_COLOR });
       }
     }
 
     if (instrumentTracks.length > 0) {
       const instrumentFolderResult = await bridge.createFolderTrack({ name: 'Instruments', color: INSTRUMENT_COLOR });
-      const instrumentFolderId = instrumentFolderResult.data;
+      const instrumentFolderId = instrumentFolderResult.data && instrumentFolderResult.data.id;
       for (const track of instrumentTracks) {
+        if (instrumentFolderId) {
+          await bridge.moveTrackToFolder({ trackId: track.id, folderId: instrumentFolderId });
+        }
         await bridge.setTrackColor({ trackId: track.id, color: INSTRUMENT_COLOR });
       }
     }
