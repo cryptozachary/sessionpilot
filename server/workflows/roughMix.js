@@ -5,77 +5,82 @@ module.exports = {
   description: 'Create a quick rough mix — set levels, pan doubles, bus vocals, add basic compression.',
 
   async preview(bridge, args = {}) {
+    const leadVolume = Number.isFinite(args.leadVolume) ? args.leadVolume : 1.0;
+    const doublePanWidth = Number.isFinite(args.doublePan) ? Math.abs(args.doublePan) : 0.6;
+    const adlibVolume = Number.isFinite(args.adlibVolume) ? args.adlibVolume : 0.7;
+    const busName = args.busName || 'Vocal Bus';
+
     const proposedActions = [
       {
         id: uuidv4(),
         type: 'setTrackVolume',
-        label: 'Set Lead Vocal to 0dB',
-        description: 'Set the lead vocal track volume to 0dB (1.0) as the anchor level.',
+        label: `Set Lead Vocal to ${leadVolume === 1 ? '0dB' : Math.round(leadVolume * 100) + '%'}`,
+        description: `Set the lead vocal track volume to ${leadVolume} as the anchor level.`,
         riskLevel: 'medium',
         requiresConfirmation: true,
-        args: { trackName: 'Lead Vocal', volume: 1.0 }
+        args: { trackName: 'Lead Vocal', volume: leadVolume }
       },
       {
         id: uuidv4(),
         type: 'setTrackPan',
-        label: 'Pan Double L to -0.6 (left)',
+        label: `Pan Double L to -${doublePanWidth} (left)`,
         description: 'Pan the left vocal double to the left side of the stereo field.',
         riskLevel: 'medium',
         requiresConfirmation: true,
-        args: { trackName: 'Double L', pan: -0.6 }
+        args: { trackName: 'Double L', pan: -doublePanWidth }
       },
       {
         id: uuidv4(),
         type: 'setTrackPan',
-        label: 'Pan Double R to 0.6 (right)',
+        label: `Pan Double R to ${doublePanWidth} (right)`,
         description: 'Pan the right vocal double to the right side of the stereo field.',
         riskLevel: 'medium',
         requiresConfirmation: true,
-        args: { trackName: 'Double R', pan: 0.6 }
+        args: { trackName: 'Double R', pan: doublePanWidth }
       },
       {
         id: uuidv4(),
         type: 'setTrackVolume',
-        label: 'Set Adlibs to -3dB',
-        description: 'Tuck the adlib track to -3dB (~0.7) so it supports without overpowering.',
+        label: `Set Adlibs to ${adlibVolume === 0.7 ? '-3dB' : Math.round(adlibVolume * 100) + '%'}`,
+        description: `Tuck the adlib track to ${Math.round(adlibVolume * 100)}% so it supports without overpowering.`,
         riskLevel: 'medium',
         requiresConfirmation: true,
-        args: { trackName: 'Adlibs', volume: 0.7 }
+        args: { trackName: 'Adlibs', volume: adlibVolume }
       },
       {
         id: uuidv4(),
         type: 'createTrack',
-        label: 'Create "Vocal Bus" if it doesn\'t exist',
-        description: 'Create a vocal bus track to group all vocal tracks for unified processing.',
+        label: `Create "${busName}" if it doesn't exist`,
+        description: `Create a vocal bus track named "${busName}" to group all vocal tracks for unified processing.`,
         riskLevel: 'low',
         requiresConfirmation: true,
-        args: { name: 'Vocal Bus', color: '#9b59b6' }
+        args: { name: busName, color: '#9b59b6' }
       },
       {
         id: uuidv4(),
         type: 'createSend',
-        label: 'Route all vocal tracks to Vocal Bus',
-        description: 'Create sends from Lead Vocal, Double L, Double R, and Adlibs to the Vocal Bus.',
+        label: `Route all vocal tracks to ${busName}`,
+        description: `Create sends from Lead Vocal, Double L, Double R, and Adlibs to the ${busName}.`,
         riskLevel: 'low',
         requiresConfirmation: true,
-        args: { trackNames: ['Lead Vocal', 'Double L', 'Double R', 'Adlibs'], destTrackName: 'Vocal Bus' }
+        args: { trackNames: ['Lead Vocal', 'Double L', 'Double R', 'Adlibs'], destTrackName: busName }
       }
     ];
 
     return {
       workflow: 'roughMix',
-      summary: 'Quick rough mix: levels set, doubles panned, vocals bussed.',
+      summary: `Quick rough mix: lead at ${Math.round(leadVolume * 100)}%, doubles panned ${Math.round(doublePanWidth * 100)}% L/R, adlibs at ${Math.round(adlibVolume * 100)}%.`,
       requiresConfirmation: true,
       proposedActions,
       checklist: [
-        'Set Lead Vocal to 0dB',
-        'Pan Double L to -0.6, Double R to 0.6',
-        'Set Adlibs to -3dB',
-        'Create Vocal Bus (if needed)',
-        'Route all vocal tracks to Vocal Bus',
+        `Set Lead Vocal to ${Math.round(leadVolume * 100)}%`,
+        `Pan Double L to -${doublePanWidth}, Double R to ${doublePanWidth}`,
+        `Set Adlibs to ${Math.round(adlibVolume * 100)}%`,
+        `Create ${busName} (if needed)`,
+        `Route all vocal tracks to ${busName}`,
         'Note: This is a rough mix for monitoring — not a final mix'
       ],
-      expectedOutcome: 'Vocal levels balanced with doubles panned L/R and adlibs tucked. Quick playback-ready mix.'
+      expectedOutcome: `Vocal levels balanced with doubles panned L/R and adlibs tucked. Quick playback-ready mix.`
     };
   },
 
@@ -83,6 +88,11 @@ module.exports = {
     const executedActions = [];
     const tracksResult = await bridge.listTracks();
     const tracks = tracksResult.data || [];
+
+    const leadVolume = Number.isFinite(args.leadVolume) ? args.leadVolume : 1.0;
+    const doublePanWidth = Number.isFinite(args.doublePan) ? Math.abs(args.doublePan) : 0.6;
+    const adlibVolume = Number.isFinite(args.adlibVolume) ? args.adlibVolume : 0.7;
+    const busName = args.busName || 'Vocal Bus';
 
     // Helper to find track by name (case-insensitive partial match)
     const findTrack = (name) => tracks.find(t =>
@@ -92,37 +102,37 @@ module.exports = {
     // Set lead vocal volume
     const leadVocal = findTrack('Lead Vocal');
     if (leadVocal) {
-      await bridge.setTrackVolume({ trackId: leadVocal.id, volume: 1.0 });
-      executedActions.push({ action: 'setTrackVolume', trackId: leadVocal.id, name: leadVocal.name, volume: 1.0 });
+      await bridge.setTrackVolume({ trackId: leadVocal.id, volume: leadVolume });
+      executedActions.push({ action: 'setTrackVolume', trackId: leadVocal.id, name: leadVocal.name, volume: leadVolume });
     }
 
     // Pan doubles
     const doubleL = findTrack('Double L');
     if (doubleL) {
-      await bridge.setTrackPan({ trackId: doubleL.id, pan: -0.6 });
-      executedActions.push({ action: 'setTrackPan', trackId: doubleL.id, name: doubleL.name, pan: -0.6 });
+      await bridge.setTrackPan({ trackId: doubleL.id, pan: -doublePanWidth });
+      executedActions.push({ action: 'setTrackPan', trackId: doubleL.id, name: doubleL.name, pan: -doublePanWidth });
     }
 
     const doubleR = findTrack('Double R');
     if (doubleR) {
-      await bridge.setTrackPan({ trackId: doubleR.id, pan: 0.6 });
-      executedActions.push({ action: 'setTrackPan', trackId: doubleR.id, name: doubleR.name, pan: 0.6 });
+      await bridge.setTrackPan({ trackId: doubleR.id, pan: doublePanWidth });
+      executedActions.push({ action: 'setTrackPan', trackId: doubleR.id, name: doubleR.name, pan: doublePanWidth });
     }
 
     // Set adlibs volume
     const adlibs = findTrack('Adlib');
     if (adlibs) {
-      await bridge.setTrackVolume({ trackId: adlibs.id, volume: 0.7 });
-      executedActions.push({ action: 'setTrackVolume', trackId: adlibs.id, name: adlibs.name, volume: 0.7 });
+      await bridge.setTrackVolume({ trackId: adlibs.id, volume: adlibVolume });
+      executedActions.push({ action: 'setTrackVolume', trackId: adlibs.id, name: adlibs.name, volume: adlibVolume });
     }
 
     // Create Vocal Bus if it doesn't exist
-    let vocalBus = findTrack('Vocal Bus');
+    let vocalBus = findTrack(busName);
     if (!vocalBus) {
-      const vocalBusResult = await bridge.createTrack({ name: 'Vocal Bus', color: '#9b59b6' });
+      const vocalBusResult = await bridge.createTrack({ name: busName, color: '#9b59b6' });
       const vocalBusId = vocalBusResult.data && vocalBusResult.data.id;
-      executedActions.push({ action: 'createTrack', trackId: vocalBusId, name: 'Vocal Bus' });
-      vocalBus = { id: vocalBusId, name: 'Vocal Bus' };
+      executedActions.push({ action: 'createTrack', trackId: vocalBusId, name: busName });
+      vocalBus = { id: vocalBusId, name: busName };
     } else {
       executedActions.push({ action: 'vocalBusExists', trackId: vocalBus.id, name: vocalBus.name });
     }
@@ -140,18 +150,18 @@ module.exports = {
 
     return {
       workflow: 'roughMix',
-      summary: 'Quick rough mix: levels set, doubles panned, vocals bussed.',
+      summary: `Quick rough mix: lead at ${Math.round(leadVolume * 100)}%, doubles panned ${Math.round(doublePanWidth * 100)}% L/R, adlibs at ${Math.round(adlibVolume * 100)}%.`,
       requiresConfirmation: true,
       proposedActions: [],
       checklist: [
-        'Set Lead Vocal to 0dB',
-        'Pan Double L to -0.6, Double R to 0.6',
-        'Set Adlibs to -3dB',
-        'Create Vocal Bus (if needed)',
-        'Route all vocal tracks to Vocal Bus',
+        `Set Lead Vocal to ${Math.round(leadVolume * 100)}%`,
+        `Pan doubles to ${Math.round(doublePanWidth * 100)}% L/R`,
+        `Set Adlibs to ${Math.round(adlibVolume * 100)}%`,
+        `Create ${busName} (if needed)`,
+        `Route all vocal tracks to ${busName}`,
         'Note: This is a rough mix for monitoring — not a final mix'
       ],
-      expectedOutcome: 'Vocal levels balanced with doubles panned L/R and adlibs tucked. Quick playback-ready mix.',
+      expectedOutcome: `Vocal levels balanced with doubles panned L/R and adlibs tucked. Quick playback-ready mix.`,
       executedActions
     };
   }

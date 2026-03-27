@@ -89,9 +89,26 @@ window.SessionPilot.ConnectionStatus = (() => {
     });
   }
 
+  function renderStaleBanner(isStale) {
+    let banner = document.getElementById('ws-stale-banner');
+    if (isStale) {
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'ws-stale-banner';
+        banner.className = 'ws-stale-banner';
+        banner.textContent = 'REAPER connection lost \u2014 reconnecting\u2026';
+        const topbar = document.getElementById('topbar');
+        if (topbar) topbar.parentNode.insertBefore(banner, topbar.nextSibling);
+      }
+    } else if (banner) {
+      banner.remove();
+    }
+  }
+
   function init() {
     State().on('connection', renderConnection);
     State().on('session', renderTransport);
+    State().on('wsStale', renderStaleBanner);
 
     // Render initial state
     renderConnection(State().get('connection'));

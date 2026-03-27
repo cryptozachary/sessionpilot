@@ -65,8 +65,26 @@ module.exports = function setupWebSocket(server, bridge) {
     }
   }, 2000);
 
+  // Heartbeat: ping every 15 seconds, terminate stale connections after 30s
+  const HEARTBEAT_INTERVAL = 15000;
+  const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach(client => {
+      if (client.isAlive === false) {
+        console.log('Terminating stale WebSocket client');
+        return client.terminate();
+      }
+      client.isAlive = false;
+      client.ping();
+    });
+  }, HEARTBEAT_INTERVAL);
+
   wss.on('connection', (ws) => {
     console.log('WebSocket client connected');
+    ws.isAlive = true;
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
 
     // Send initial state immediately
     sendStateTo(ws);
@@ -77,6 +95,11 @@ module.exports = function setupWebSocket(server, bridge) {
         if (msg.type === 'refresh') {
           // Trigger immediate state push to this client
           sendStateTo(ws);
+        } else if (msg.type === 'ping') {
+          // Application-level ping for browsers that don't expose WebSocket pong
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'pong', timestamp: new Date().toISOString() }));
+          }
         }
       } catch (e) {
         // Ignore invalid messages
@@ -91,6 +114,7 @@ module.exports = function setupWebSocket(server, bridge) {
   // Clean up on server close
   wss.on('close', () => {
     clearInterval(pollInterval);
+    clearInterval(heartbeatInterval);
   });
 
   return { broadcast, wss };

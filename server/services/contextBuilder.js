@@ -168,6 +168,23 @@ async function buildSessionContext(bridge, options = {}) {
   const markers = Array.isArray(markerData.markers) ? markerData.markers : [];
   const regions = Array.isArray(markerData.regions) ? markerData.regions : [];
 
+  // Compute recording metadata from tracks
+  const armedTracks = Array.isArray(tracks) ? tracks.filter(t => t.isArmed || t.armed) : [];
+  const trackTakeCounts = Array.isArray(tracks) ? tracks.reduce((acc, t) => {
+    const takeCount = Array.isArray(t.takes) ? t.takes.length : 0;
+    if (takeCount > 0) acc.push({ trackId: t.id, name: t.name, takeCount });
+    return acc;
+  }, []) : [];
+  const totalTakes = trackTakeCounts.reduce((sum, t) => sum + t.takeCount, 0);
+
+  const recording = {
+    armedTrackCount: armedTracks.length,
+    armedTracks: armedTracks.map(t => ({ id: t.id, name: t.name })),
+    tracksWithTakes: trackTakeCounts,
+    totalTakeCount: totalTakes,
+    isRecording: transport.state === 'recording'
+  };
+
   const context = {
     generatedAt: new Date().toISOString(),
     connection,
@@ -177,6 +194,7 @@ async function buildSessionContext(bridge, options = {}) {
     selectedTrack,
     markers,
     regions,
+    recording,
     recentActions: actionLog.getRecent(actionLogLimit),
     warnings
   };

@@ -1,11 +1,42 @@
 window.SessionPilot = window.SessionPilot || {};
 
 window.SessionPilot.State = (() => {
+  const STORAGE_KEY = 'sessionpilot_state';
+  const PERSISTED_KEYS = ['chatMessages', 'actionLog'];
+  const MAX_CHAT_PERSIST = 50;
+  const MAX_LOG_PERSIST = 30;
+
+  function loadPersistedState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw);
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function persistState() {
+    try {
+      const toSave = {
+        chatMessages: state.chatMessages.slice(-MAX_CHAT_PERSIST),
+        actionLog: state.actionLog.slice(0, MAX_LOG_PERSIST),
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    } catch (e) {
+      // localStorage full or unavailable — silently skip
+    }
+  }
+
+  const persisted = loadPersistedState();
+
   const state = {
     session: null,
     tracks: [],
     selectedTrack: null,
     connection: { connected: false, bridgeType: 'unknown' },
+    wsStale: false,
     voice: {
       supported: false,
       enabled: false,
@@ -15,8 +46,8 @@ window.SessionPilot.State = (() => {
       error: '',
       speakReplies: true
     },
-    chatMessages: [],
-    actionLog: [],
+    chatMessages: Array.isArray(persisted.chatMessages) ? persisted.chatMessages : [],
+    actionLog: Array.isArray(persisted.actionLog) ? persisted.actionLog : [],
     pendingActions: [],
     workflows: []
   };
@@ -30,6 +61,7 @@ window.SessionPilot.State = (() => {
   function set(key, value) {
     state[key] = value;
     emit(key, value);
+    if (PERSISTED_KEYS.includes(key)) persistState();
   }
 
   function on(key, fn) {
@@ -60,6 +92,7 @@ window.SessionPilot.State = (() => {
     };
     state.chatMessages.push(msg);
     emit('chatMessages', state.chatMessages);
+    persistState();
     return msg;
   }
 
@@ -76,7 +109,15 @@ window.SessionPilot.State = (() => {
       state.actionLog = state.actionLog.slice(0, 100);
     }
     emit('actionLog', state.actionLog);
+    persistState();
   }
 
-  return { get, set, on, off, emit, addChatMessage, addActionLogEntry };
+  /**
+   * Clear persisted state (e.g. for a new session).
+   */
+  function clearPersisted() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+  }
+
+  return { get, set, on, off, emit, addChatMessage, addActionLogEntry, clearPersisted };
 })();

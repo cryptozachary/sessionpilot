@@ -164,10 +164,14 @@ module.exports = function createActionRoutes(bridge) {
           return res.json({ ok: false, error: 'This workflow requires confirmation. Set confirmed=true to proceed.' });
         }
 
-        const result = await workflowService.executeWorkflow(bridge, workflow, args);
+        const broadcast = req.app.get('wsBroadcast');
+        const onProgress = broadcast
+          ? (progress) => broadcast('workflow_progress', progress)
+          : undefined;
+
+        const result = await workflowService.executeWorkflow(bridge, workflow, args, { onProgress });
 
         // Broadcast action event if websocket is available
-        const broadcast = req.app.get('wsBroadcast');
         if (broadcast) {
           broadcast('action_executed', { workflow, args, result: result.data });
         }

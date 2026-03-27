@@ -199,11 +199,17 @@ window.SessionPilot.Chat = (() => {
       });
     }
 
-    // Welcome message
-    State().addChatMessage(
-      'assistant',
-      "Hey! I'm your session engineer. I can set up vocal tracks, prepare punch-ins, troubleshoot monitoring issues, and help organize your session.\n\nWhat are we working on?"
-    );
+    // Welcome message (only if no restored chat history)
+    const existing = State().get('chatMessages');
+    if (!existing || existing.length === 0) {
+      State().addChatMessage(
+        'assistant',
+        "Hey! I'm your session engineer. I can set up vocal tracks, prepare punch-ins, troubleshoot monitoring issues, and help organize your session.\n\nWhat are we working on?"
+      );
+    } else {
+      // Re-render restored messages
+      renderMessages(existing);
+    }
   }
 
   return { init, sendMessage: queueMessage };

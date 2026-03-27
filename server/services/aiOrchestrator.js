@@ -314,8 +314,38 @@ function extractArgs(message, intent) {
     case 'transport_goto_start':
     case 'transport_goto_end':
     case 'comp_takes':
-    case 'rough_mix':
-    case 'setup_headphone_mix':
+    case 'setup_headphone_mix': {
+      const hpArgs = {};
+      // Parse reverb type: "reverb ReaDelay", "with Valhalla", "use ReaVerbate"
+      const reverbMatch = message.match(/(?:reverb|with|use)\s+["']?([A-Z][A-Za-z0-9_-]+)["']?/);
+      if (reverbMatch) hpArgs.reverb = reverbMatch[1];
+      // Parse volume: "at -3dB", "volume 50%", "cue level 0.3"
+      const hpPctMatch = message.match(/(\d+)\s*%/);
+      if (hpPctMatch) hpArgs.volume = parseInt(hpPctMatch[1], 10) / 100;
+      const hpDbMatch = message.match(/-(\d+)\s*dB/i);
+      if (hpDbMatch && !hpPctMatch) hpArgs.volume = Math.pow(10, -parseInt(hpDbMatch[1], 10) / 20);
+      return hpArgs;
+    }
+
+    case 'rough_mix': {
+      const rmArgs = {};
+      // Parse lead volume: "lead at -2dB", "lead at 80%"
+      const leadPct = message.match(/lead\s*(?:at|to)?\s*(\d+)\s*%/i);
+      if (leadPct) rmArgs.leadVolume = parseInt(leadPct[1], 10) / 100;
+      const leadDb = message.match(/lead\s*(?:at|to)?\s*-(\d+)\s*dB/i);
+      if (leadDb && !leadPct) rmArgs.leadVolume = Math.pow(10, -parseInt(leadDb[1], 10) / 20);
+      // Parse double pan: "pan doubles hard", "doubles wide", "doubles 80%"
+      if (/\b(hard|wide|full)\b/i.test(message)) rmArgs.doublePan = 1.0;
+      const dblPct = message.match(/doubles?\s*(?:at|to)?\s*(\d+)\s*%/i);
+      if (dblPct) rmArgs.doublePan = parseInt(dblPct[1], 10) / 100;
+      // Parse adlib volume: "adlibs at -6dB", "adlibs at 50%"
+      const adPct = message.match(/adlib\s*(?:at|to)?\s*(\d+)\s*%/i);
+      if (adPct) rmArgs.adlibVolume = parseInt(adPct[1], 10) / 100;
+      const adDb = message.match(/adlib\s*(?:at|to)?\s*-(\d+)\s*dB/i);
+      if (adDb && !adPct) rmArgs.adlibVolume = Math.pow(10, -parseInt(adDb[1], 10) / 20);
+      return rmArgs;
+    }
+
     case 'preflight_check':
     case 'manage_fx_chain':
     case 'undo':

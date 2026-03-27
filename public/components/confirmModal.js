@@ -100,6 +100,40 @@ window.SessionPilot.ConfirmModal = (() => {
     return div.innerHTML;
   }
 
+  function renderProgress(progress) {
+    const body = document.getElementById('modal-body');
+    const modal = document.getElementById('confirm-modal');
+    if (!body || !modal || modal.classList.contains('hidden')) return;
+    if (!progress) return;
+
+    let progressEl = body.querySelector('.workflow-progress');
+    if (!progressEl) {
+      progressEl = document.createElement('div');
+      progressEl.className = 'workflow-progress';
+      body.appendChild(progressEl);
+    }
+
+    if (progress.phase === 'start') {
+      progressEl.innerHTML = `
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: 0%"></div>
+        </div>
+        <div class="progress-label">Starting\u2026</div>
+      `;
+    } else if (progress.phase === 'step') {
+      const pct = progress.totalSteps > 0 ? Math.round((progress.step / progress.totalSteps) * 100) : 0;
+      const bar = progressEl.querySelector('.progress-bar');
+      const label = progressEl.querySelector('.progress-label');
+      if (bar) bar.style.width = pct + '%';
+      if (label) label.textContent = `${progress.label} (${progress.step}/${progress.totalSteps})`;
+    } else if (progress.phase === 'done') {
+      const bar = progressEl.querySelector('.progress-bar');
+      const label = progressEl.querySelector('.progress-label');
+      if (bar) bar.style.width = '100%';
+      if (label) label.textContent = 'Complete!';
+    }
+  }
+
   function init() {
     const cancelBtn = document.getElementById('modal-cancel');
     const confirmBtn = document.getElementById('modal-confirm');
@@ -131,6 +165,9 @@ window.SessionPilot.ConfirmModal = (() => {
         }
       }
     });
+
+    // Listen for workflow progress
+    State().on('workflowProgress', renderProgress);
   }
 
   return { init, show, hide, confirm };
