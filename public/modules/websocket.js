@@ -124,6 +124,11 @@ window.SessionPilot.WS = (() => {
         State().set('workflowProgress', msg.data);
         break;
 
+      case 'peak_update':
+        // Use emit (not set) to avoid localStorage persistence for volatile peak data
+        State().emit('peakUpdate', msg.data);
+        break;
+
       case 'action_executed':
         // Clear progress and add to action log
         State().set('workflowProgress', null);

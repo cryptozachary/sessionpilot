@@ -57,16 +57,26 @@ window.SessionPilot.Sidebar = (() => {
       return;
     }
 
+    const typeIcons = { midi: 'M', instrument: 'I', folder: 'F' };
     container.innerHTML = `
       <div class="panel-header">TRACKS (${tracks.length})</div>
       <div class="track-list-items">
         ${tracks.map((track, i) => {
           const isSelected = track.index === selectedIdx || i === selectedIdx;
           const color = track.color || '#555';
+          const ttype = track.trackType || 'audio';
+          const typeIcon = typeIcons[ttype]
+            ? `<span class="track-type-icon ${ttype}" title="${ttype}">${typeIcons[ttype]}</span>`
+            : '';
           return `
             <div class="track-row ${isSelected ? 'selected' : ''}" data-track-index="${track.index != null ? track.index : i}">
               <div class="track-color-bar" style="background: ${color}"></div>
+              ${typeIcon}
               <span class="track-name">${escapeHtml(track.name || `Track ${i + 1}`)}</span>
+              <div class="track-meter" data-track-index="${track.index != null ? track.index : i}">
+                <div class="track-meter-bar left" style="width: 0%"></div>
+                <div class="track-meter-bar right" style="width: 0%"></div>
+              </div>
               <div class="track-status-dots">
                 <span class="track-dot armed ${track.armed ? 'visible' : ''}" title="Armed"></span>
                 <span class="track-dot monitoring ${track.monitoring ? 'visible' : ''}" title="Monitoring"></span>
@@ -98,6 +108,18 @@ window.SessionPilot.Sidebar = (() => {
     return div.innerHTML;
   }
 
+  function updatePeakMeters(data) {
+    if (!data || !data.peaks) return;
+    data.peaks.forEach(p => {
+      const meterEl = document.querySelector(`.track-meter[data-track-index="${p.trackIndex}"]`);
+      if (!meterEl) return;
+      const leftBar = meterEl.querySelector('.left');
+      const rightBar = meterEl.querySelector('.right');
+      if (leftBar) leftBar.style.width = `${Math.min(p.peakL * 100, 100)}%`;
+      if (rightBar) rightBar.style.width = `${Math.min(p.peakR * 100, 100)}%`;
+    });
+  }
+
   function init() {
     State().on('session', renderSessionSummary);
     State().on('tracks', renderTrackList);
@@ -105,6 +127,7 @@ window.SessionPilot.Sidebar = (() => {
       // Re-render track list to update selection highlight
       renderTrackList(State().get('tracks'));
     });
+    State().on('peakUpdate', updatePeakMeters);
 
     // Render initial state
     renderSessionSummary(State().get('session'));

@@ -15,7 +15,7 @@ local COMMAND_DIR = BRIDGE_DIR .. "commands/"
 local RESULT_DIR = BRIDGE_DIR .. "results/"
 local STATE_FILE = BRIDGE_DIR .. "state.json"
 local POLL_INTERVAL = 0.1  -- seconds
-local STATE_INTERVAL = 1.0 -- seconds between state snapshots
+local STATE_INTERVAL = 0.3 -- seconds between state snapshots (was 1.0)
 
 ---------------------------------------------------------------------------
 -- Utility: JSON encoder (minimal, no external deps)
@@ -430,12 +430,38 @@ local function getTrackSummary(track, index)
     colorHex = string.format("#%02x%02x%02x", r, g, b)
   end
 
-  -- Get record input
+  -- Get record input and determine track type
   local recInput = reaper.GetMediaTrackInfo_Value(track, "I_RECINPUT")
   local inputLabel = nil
-  if recInput >= 0 then
+  local trackType = "audio"
+  local midiInput = nil
+  local instrumentPlugin = nil
+
+  if recInput >= 4096 then
+    -- MIDI input: 4096 = all MIDI, 4096+ch for specific channel
+    trackType = "midi"
+    local ch = recInput - 4096
+    midiInput = ch == 0 and "All Channels" or ("Channel " .. ch)
+  elseif recInput >= 0 then
     inputLabel = "Input " .. (recInput + 1)
   end
+
+  -- Check for VSTi instrument
+  local instrIdx = reaper.TrackFX_GetInstrument(track)
+  if instrIdx >= 0 then
+    trackType = "instrument"
+    local _, instrName = reaper.TrackFX_GetFXName(track, instrIdx, "")
+    instrumentPlugin = instrName
+  end
+
+  -- Folder tracks
+  if folderDepth >= 1 then
+    trackType = "folder"
+  end
+
+  -- Peak meters
+  local peakL = reaper.Track_GetPeakInfo(track, 0)
+  local peakR = reaper.Track_GetPeakInfo(track, 1)
 
   return {
     id = "track_" .. index,
@@ -450,7 +476,12 @@ local function getTrackSummary(track, index)
     inputLabel = inputLabel,
     folderDepth = folderDepth,
     fxNames = fxNames,
-    itemCount = itemCount
+    itemCount = itemCount,
+    trackType = trackType,
+    midiInput = midiInput,
+    instrumentPlugin = instrumentPlugin,
+    peakL = peakL,
+    peakR = peakR
   }
 end
 
@@ -1090,6 +1121,122 @@ commands.loadFxChain = function(args)
 end
 
 ---------------------------------------------------------------------------
+-- MIDI / Instrument Track Creation
+---------------------------------------------------------------------------
+commands.createMidiTrack = function(args)
+  local idx = args.insertIndex or reaper.CountTracks(0)
+  reaper.InsertTrackAtIndex(idx, true)
+  local track = reaper.GetTrack(0, idx)
+  if args.name then
+    reaper.GetSetMediaTrackInfo_String(track, "P_NAME", args.name, true)
+  end
+  -- Set MIDI input: 4096 = All MIDI inputs, all channels
+  local midiInput = 4096 + (args.midiChannel or 0)
+  reaper.SetMediaTrackInfo_Value(track, "I_RECINPUT", midiInput)
+  -- Set record mode to MIDI
+  reaper.SetMediaTrackInfo_Value(track, "I_RECMODE", 7) -- MIDI overdub
+  -- Add instrument plugin if specified
+  if args.instrument then
+    reaper.TrackFX_AddByName(track, args.instrument, false, -1)
+  end
+  if args.color then
+    local r, g, b = args.color:match("#(%x%x)(%x%x)(%x%x)")
+    if r then
+      local col = reaper.ColorToNative(tonumber(r, 16), tonumber(g, 16), tonumber(b, 16)) | 0x1000000
+      reaper.SetTrackColor(track, col)
+    end
+  end
+  return { ok = true, data = getTrackSummary(track, idx) }
+end
+
+---------------------------------------------------------------------------
+-- FX Parameter Control
+---------------------------------------------------------------------------
+commands.getFxParameters = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+  local fxIndex = args.fxIndex or 0
+  if fxIndex < 0 or fxIndex >= reaper.TrackFX_GetCount(track) then
+    return { ok = false, errors = {"FX index out of range"} }
+  end
+  local _, fxName = reaper.TrackFX_GetFXName(track, fxIndex, "")
+  local paramCount = reaper.TrackFX_GetNumParams(track, fxIndex)
+  local params = {}
+  for i = 0, paramCount - 1 do
+    local _, paramName = reaper.TrackFX_GetParamName(track, fxIndex, i, "")
+    local val, minVal, maxVal = reaper.TrackFX_GetParam(track, fxIndex, i)
+    local _, formatted = reaper.TrackFX_GetFormattedParamValue(track, fxIndex, i, "")
+    params[#params + 1] = {
+      index = i,
+      name = paramName,
+      value = val,
+      minValue = minVal,
+      maxValue = maxVal,
+      formattedValue = formatted or ""
+    }
+  end
+  return { ok = true, data = { trackId = args.trackId, fxIndex = fxIndex, fxName = fxName, paramCount = paramCount, params = params } }
+end
+
+commands.setFxParameter = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+  local fxIndex = args.fxIndex or 0
+  local paramIndex = args.paramIndex
+  if paramIndex == nil then return { ok = false, errors = {"paramIndex is required"} } end
+  local value = args.value
+  if value == nil then return { ok = false, errors = {"value is required"} } end
+  if fxIndex < 0 or fxIndex >= reaper.TrackFX_GetCount(track) then
+    return { ok = false, errors = {"FX index out of range"} }
+  end
+  reaper.TrackFX_SetParam(track, fxIndex, paramIndex, value)
+  local _, paramName = reaper.TrackFX_GetParamName(track, fxIndex, paramIndex, "")
+  local _, formatted = reaper.TrackFX_GetFormattedParamValue(track, fxIndex, paramIndex, "")
+  return {
+    ok = true,
+    data = {
+      trackId = args.trackId,
+      fxIndex = fxIndex,
+      paramIndex = paramIndex,
+      paramName = paramName,
+      value = value,
+      formattedValue = formatted or ""
+    }
+  }
+end
+
+commands.setFxPreset = function(args)
+  local track = findTrackById(args.trackId)
+  if not track then return { ok = false, errors = {"Track not found"} } end
+  local fxIndex = args.fxIndex or 0
+  if fxIndex < 0 or fxIndex >= reaper.TrackFX_GetCount(track) then
+    return { ok = false, errors = {"FX index out of range"} }
+  end
+  local success = reaper.TrackFX_SetPreset(track, fxIndex, args.presetName or "")
+  if success then
+    return { ok = true, data = { trackId = args.trackId, fxIndex = fxIndex, preset = args.presetName } }
+  else
+    return { ok = false, errors = {"Failed to set preset"} }
+  end
+end
+
+---------------------------------------------------------------------------
+-- Peak Meters (lightweight, for fast polling)
+---------------------------------------------------------------------------
+commands.getTrackPeaks = function(args)
+  local peaks = {}
+  for i = 0, reaper.CountTracks(0) - 1 do
+    local track = reaper.GetTrack(0, i)
+    peaks[#peaks + 1] = {
+      trackIndex = i,
+      peakL = reaper.Track_GetPeakInfo(track, 0),
+      peakR = reaper.Track_GetPeakInfo(track, 1)
+    }
+  end
+  return { ok = true, data = { peaks = peaks } }
+end
+
+---------------------------------------------------------------------------
 -- Transport Controls
 ---------------------------------------------------------------------------
 commands.play = function(args)
@@ -1397,10 +1544,44 @@ local function processCommands()
         result.errors = result.errors or {}
 
         writeFile(RESULT_DIR .. cmd.requestId .. ".json", jsonEncode(result))
+
+        -- Immediate state write after mutation commands for responsiveness
+        if cmd.command ~= "ping" and cmd.command ~= "getProjectSummary"
+           and cmd.command ~= "listTracks" and cmd.command ~= "getSelectedTrack"
+           and cmd.command ~= "getMarkersAndRegions" and cmd.command ~= "getTransportState"
+           and cmd.command ~= "getTrackFx" and cmd.command ~= "getTrackPeaks"
+           and cmd.command ~= "getFxParameters" then
+          writeStateSnapshot()
+          lastStateWrite = reaper.time_precise()
+        end
       end
       deleteFile(filepath)
     end
   end
+end
+
+---------------------------------------------------------------------------
+-- Change detection for responsive state updates
+---------------------------------------------------------------------------
+local lastTransportState = nil
+local lastTrackCount = nil
+local lastSelectedTrackIdx = nil
+
+local function hasStateChanged()
+  local playState = reaper.GetPlayState()
+  local trackCount = reaper.CountTracks(0)
+  local selTrack = reaper.GetSelectedTrack(0, 0)
+  local selIdx = selTrack and math.floor(reaper.GetMediaTrackInfo_Value(selTrack, "IP_TRACKNUMBER") - 1) or -1
+
+  local changed = (playState ~= lastTransportState) or
+                  (trackCount ~= lastTrackCount) or
+                  (selIdx ~= lastSelectedTrackIdx)
+
+  lastTransportState = playState
+  lastTrackCount = trackCount
+  lastSelectedTrackIdx = selIdx
+
+  return changed
 end
 
 ---------------------------------------------------------------------------
@@ -1412,7 +1593,8 @@ local function mainLoop()
   processCommands()
 
   local now = reaper.time_precise()
-  if now - lastStateWrite >= STATE_INTERVAL then
+  local changed = hasStateChanged()
+  if changed or (now - lastStateWrite >= STATE_INTERVAL) then
     writeStateSnapshot()
     lastStateWrite = now
   end

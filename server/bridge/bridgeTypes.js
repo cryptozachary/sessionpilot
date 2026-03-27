@@ -115,6 +115,20 @@ const CONFIRMATION_POLICY = {
   getTrackFx: RISK_LEVELS.LOW,
   removeFx: RISK_LEVELS.MEDIUM,
   toggleFxBypass: RISK_LEVELS.LOW,
+  getFxParameters: RISK_LEVELS.LOW,
+  setFxParameter: RISK_LEVELS.LOW,
+  setFxPreset: RISK_LEVELS.MEDIUM,
+
+  // MIDI / instrument tracks
+  createMidiTrack: RISK_LEVELS.MEDIUM,
+
+  // Track peaks
+  getTrackPeaks: RISK_LEVELS.LOW,
+
+  // Session templates
+  saveSessionTemplate: RISK_LEVELS.LOW,
+  loadSessionTemplate: RISK_LEVELS.HIGH,
+  deleteSessionTemplate: RISK_LEVELS.HIGH,
 
   // Rendering
   renderProject: RISK_LEVELS.HIGH,
@@ -128,6 +142,16 @@ const CONFIRMATION_POLICY = {
 /**
  * Standard track colors for vocal session organization.
  */
+/**
+ * Track type identifiers.
+ */
+const TRACK_TYPES = {
+  AUDIO: 'audio',
+  MIDI: 'midi',
+  INSTRUMENT: 'instrument',
+  FOLDER: 'folder'
+};
+
 const TRACK_COLORS = {
   LEAD_VOCAL: '#e74c3c',
   DOUBLE_LEFT: '#e67e22',
@@ -135,7 +159,8 @@ const TRACK_COLORS = {
   ADLIB: '#9b59b6',
   BUS: '#3498db',
   FOLDER: '#2ecc71',
-  INSTRUMENT: '#1abc9c'
+  INSTRUMENT: '#1abc9c',
+  MIDI: '#16a085'
 };
 
 /**
@@ -147,6 +172,7 @@ module.exports = {
   RISK_LEVELS,
   TRANSPORT_STATES,
   BRIDGE_TYPES,
+  TRACK_TYPES,
   WORKFLOW_NAMES,
   CONFIRMATION_POLICY,
   TRACK_COLORS,

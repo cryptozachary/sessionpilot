@@ -148,6 +148,40 @@ const INTENT_PATTERNS = [
   { patterns: [/\bundo\b/i, /take\s*(that|it)\s*back/i, /reverse\s*(that|last)/i], intent: 'undo', actionType: 'safe_action' },
   { patterns: [/\bredo\b/i, /redo\s*(that|last)/i], intent: 'redo', actionType: 'safe_action' },
 
+  // MIDI / instrument track creation (must be before generic create_track)
+  {
+    patterns: [/create\s*(a\s*)?midi\s*track/i, /new\s*midi\s*track/i, /add\s*(a\s*)?midi\s*track/i, /midi\s*track/i],
+    intent: 'create_midi_track', actionType: 'safe_action'
+  },
+  {
+    patterns: [/create\s*(an?\s*)?instrument\s*track/i, /new\s*instrument\s*track/i, /add\s*(an?\s*)?instrument/i, /load\s*(a\s*)?synth/i, /add\s*(a\s*)?synth/i],
+    intent: 'create_instrument_track', actionType: 'safe_action'
+  },
+
+  // FX parameter control
+  {
+    patterns: [/set\s*(the\s*)?(eq|comp|reverb|delay|fx|plugin)\s*param/i, /tweak\s*(the\s*)?(eq|comp|reverb|delay|fx|plugin)/i, /adjust\s*(the\s*)?(eq|comp|reverb|delay|fx|plugin)/i, /(?:set|turn)\s*(the\s*)?(threshold|ratio|frequency|freq|gain|attack|release|feedback|mix|drive|time|decay|cutoff|resonance)\s*(?:to|at)/i],
+    intent: 'set_fx_parameter', actionType: 'safe_action'
+  },
+  {
+    patterns: [/show\s*(me\s*)?(the\s*)?param/i, /what.*param/i, /list\s*param/i, /get\s*(the\s*)?param/i, /show\s*(me\s*)?(the\s*)?knobs/i],
+    intent: 'get_fx_parameters', actionType: 'advice'
+  },
+
+  // Session templates
+  {
+    patterns: [/save\s*(session\s*)?template/i, /save\s*(this\s*)?session\s*as/i, /snapshot\s*(the\s*)?session/i],
+    intent: 'save_session_template', actionType: 'safe_action'
+  },
+  {
+    patterns: [/load\s*(session\s*)?template/i, /restore\s*(session\s*)?template/i, /apply\s*template/i, /use\s*template/i],
+    intent: 'load_session_template', actionType: 'needs_confirmation'
+  },
+  {
+    patterns: [/list\s*(session\s*)?templates?/i, /show\s*(me\s*)?(session\s*)?templates?/i, /what\s*templates?/i, /my\s*templates?/i],
+    intent: 'list_session_templates', actionType: 'advice'
+  },
+
   // Simple track actions
   { patterns: [/arm\s*(the\s*)?track/i, /arm\s*it/i], intent: 'arm_track', actionType: 'safe_action' },
   { patterns: [/disarm/i, /un-?arm/i], intent: 'disarm_track', actionType: 'safe_action' },
@@ -345,6 +379,69 @@ function extractArgs(message, intent) {
       if (adDb && !adPct) rmArgs.adlibVolume = Math.pow(10, -parseInt(adDb[1], 10) / 20);
       return rmArgs;
     }
+
+    case 'create_midi_track': {
+      const nameMatch = message.match(/(?:midi\s*track|track)\s*(?:called|named)\s*["']?(.+?)["']?\s*$/i);
+      if (nameMatch) return { name: nameMatch[1].trim() };
+      const quotedMatch = message.match(/["'](.+?)["']/);
+      if (quotedMatch) return { name: quotedMatch[1] };
+      return {};
+    }
+
+    case 'create_instrument_track': {
+      const args = {};
+      // Extract instrument/synth name: "add a synth called ReaSynth" or "instrument track with Kontakt"
+      const instrMatch = message.match(/(?:with|using|called|named|load)\s*["']?([A-Z][A-Za-z0-9_ -]+)["']?/i);
+      if (instrMatch) args.instrument = instrMatch[1].trim();
+      // Extract track name if separate from instrument
+      const trackNameMatch = message.match(/track\s*(?:called|named)\s*["']?(.+?)["']?(?:\s*with|\s*$)/i);
+      if (trackNameMatch) args.name = trackNameMatch[1].trim();
+      return args;
+    }
+
+    case 'set_fx_parameter': {
+      const args = {};
+      // Extract parameter name: "set threshold to -20" or "turn the frequency to 5000"
+      const paramMatch = message.match(/(?:set|tweak|adjust|turn)\s*(?:the\s*)?(threshold|ratio|frequency|freq|gain|attack|release|feedback|mix|drive|time|decay|cutoff|resonance|bandwidth|output|input|wet|dry)\s*(?:to|at)\s*(-?\d+(?:\.\d+)?)/i);
+      if (paramMatch) {
+        args.paramName = paramMatch[1];
+        args.value = parseFloat(paramMatch[2]);
+      }
+      // Extract FX name context: "on the compressor" or "on ReaComp"
+      const fxMatch = message.match(/(?:on|for|in)\s*(?:the\s*)?["']?([A-Za-z][A-Za-z0-9_ -]+)["']?/i);
+      if (fxMatch) args.fxName = fxMatch[1].trim();
+      return args;
+    }
+
+    case 'get_fx_parameters': {
+      // Extract FX index or name
+      const fxMatch = message.match(/(?:for|on|of)\s*(?:the\s*)?(?:fx\s*)?["']?([A-Za-z][A-Za-z0-9_ -]+)["']?/i);
+      if (fxMatch) return { fxName: fxMatch[1].trim() };
+      const idxMatch = message.match(/(?:fx|plugin|slot)\s*(\d+)/i);
+      if (idxMatch) return { fxIndex: parseInt(idxMatch[1], 10) };
+      return {};
+    }
+
+    case 'save_session_template': {
+      // Extract template name: 'save template as "My Template"' or 'save template My Session'
+      const quotedMatch = message.match(/(?:as|called|named)\s*["'](.+?)["']/i);
+      if (quotedMatch) return { name: quotedMatch[1] };
+      const unquotedMatch = message.match(/(?:as|called|named)\s+(.+)/i);
+      if (unquotedMatch) return { name: unquotedMatch[1].trim() };
+      return {};
+    }
+
+    case 'load_session_template': {
+      // Extract template name or ID
+      const quotedMatch = message.match(/(?:template|load|restore|apply|use)\s*["'](.+?)["']/i);
+      if (quotedMatch) return { name: quotedMatch[1] };
+      const unquotedMatch = message.match(/(?:load|restore|apply|use)\s*(?:session\s*)?template\s+(.+)/i);
+      if (unquotedMatch) return { name: unquotedMatch[1].trim() };
+      return {};
+    }
+
+    case 'list_session_templates':
+      return {};
 
     case 'preflight_check':
     case 'manage_fx_chain':
@@ -743,6 +840,161 @@ async function handleDirectAction(bridge, matched, message) {
         'advice',
         baseContext
       );
+    }
+
+    case 'create_midi_track': {
+      const trackName = args.name || 'MIDI Track';
+      return buildResponse(
+        `I'll create a new MIDI track called "${trackName}".`,
+        [{
+          type: 'createMidiTrack',
+          args: { name: trackName },
+          label: `Create MIDI track "${trackName}"`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'create_instrument_track': {
+      const trackName = args.name || (args.instrument ? args.instrument : 'Instrument Track');
+      const instrument = args.instrument || null;
+      const desc = instrument
+        ? `I'll create an instrument track "${trackName}" with ${instrument}.`
+        : `I'll create an instrument track called "${trackName}". You can load a plugin on it afterwards.`;
+      return buildResponse(
+        desc,
+        [{
+          type: 'createMidiTrack',
+          args: { name: trackName, instrument },
+          label: `Create instrument track "${trackName}"`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'get_fx_parameters': {
+      const selected = await bridge.getSelectedTrack();
+      if (!selected.ok || !selected.data) {
+        return buildResponse("Select a track first so I can show its FX parameters.", [], 'advice', baseContext);
+      }
+      const trackName = selected.data.name || 'Track ' + selected.data.index;
+      const fxList = selected.data.fxNames || [];
+      if (fxList.length === 0) {
+        return buildResponse(`"${trackName}" has no FX loaded. Add some plugins first!`, [], 'advice', baseContext);
+      }
+      // Determine which FX to show params for
+      let fxIndex = 0;
+      if (args.fxIndex !== undefined) {
+        fxIndex = args.fxIndex;
+      } else if (args.fxName) {
+        const idx = fxList.findIndex(name => name.toLowerCase().includes(args.fxName.toLowerCase()));
+        if (idx >= 0) fxIndex = idx;
+      }
+      const fxName = fxList[fxIndex] || `FX ${fxIndex}`;
+      try {
+        const paramResult = await bridge.getFxParameters({ trackId: selected.data.id, fxIndex });
+        const params = (paramResult.data && paramResult.data.params) || [];
+        const lines = [`**${fxName}** on "${trackName}" — ${params.length} parameters:\n`];
+        params.slice(0, 20).forEach((p, i) => {
+          lines.push(`  ${i}. **${p.name}**: ${p.formattedValue || (p.value !== undefined ? p.value.toFixed(2) : '?')} (${p.minValue ?? p.min ?? 0}–${p.maxValue ?? p.max ?? 1})`);
+        });
+        if (params.length > 20) lines.push(`  ...and ${params.length - 20} more`);
+        return buildResponse(lines.join('\n'), [], 'advice', baseContext);
+      } catch (e) {
+        return buildResponse(`Couldn't read parameters for ${fxName}: ${e.message}`, [], 'advice', baseContext);
+      }
+    }
+
+    case 'set_fx_parameter': {
+      const selected = await bridge.getSelectedTrack();
+      if (!selected.ok || !selected.data) {
+        return buildResponse("Select a track first so I can adjust its FX.", [], 'advice', baseContext);
+      }
+      if (!args.paramName || args.value === undefined) {
+        return buildResponse(
+          "Tell me what to adjust, like \"set threshold to -20\" or \"turn the frequency to 5000\".",
+          [], 'advice', baseContext
+        );
+      }
+      const trackName = selected.data.name || 'Track ' + selected.data.index;
+      return buildResponse(
+        `Setting ${args.paramName} to ${args.value} on "${trackName}".`,
+        [{
+          type: 'setFxParameter',
+          args: {
+            trackIndex: selected.data.index,
+            fxName: args.fxName || null,
+            paramName: args.paramName,
+            value: args.value
+          },
+          label: `Set ${args.paramName} to ${args.value}`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'save_session_template': {
+      const templateName = args.name || null;
+      if (!templateName) {
+        return buildResponse(
+          "What should I call this template? Say something like: save template as \"My Vocal Session\".",
+          [], 'advice', baseContext
+        );
+      }
+      return buildResponse(
+        `I'll save the current session as template "${templateName}".`,
+        [{
+          type: 'saveSessionTemplate',
+          args: { name: templateName },
+          label: `Save session template "${templateName}"`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'load_session_template': {
+      if (!args.name) {
+        return buildResponse(
+          "Which template do you want to load? Say something like: load template \"My Vocal Session\".",
+          [], 'advice', baseContext
+        );
+      }
+      return buildResponse(
+        `I'll load the "${args.name}" template. This will create tracks, markers, and regions from the template.`,
+        [{
+          type: 'loadSessionTemplate',
+          args: { name: args.name },
+          label: `Load template "${args.name}"`,
+          requiresConfirmation: true
+        }],
+        'needs_confirmation',
+        baseContext
+      );
+    }
+
+    case 'list_session_templates': {
+      try {
+        const templateService = require('./templateService');
+        const templates = await templateService.listTemplates();
+        if (templates.length === 0) {
+          return buildResponse("No saved templates yet. Save one with: save template as \"My Session\".", [], 'advice', baseContext);
+        }
+        const lines = [`You have **${templates.length}** saved template(s):\n`];
+        templates.forEach(t => {
+          lines.push(`  - **${t.name}** (${t.trackCount} tracks, ${t.markerCount} markers) — ${t.description || 'no description'}`);
+        });
+        return buildResponse(lines.join('\n'), [], 'advice', baseContext);
+      } catch (e) {
+        return buildResponse(`Couldn't list templates: ${e.message}`, [], 'advice', baseContext);
+      }
     }
 
     default:

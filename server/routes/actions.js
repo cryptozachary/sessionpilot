@@ -131,7 +131,34 @@ const DIRECT_ACTION_MAP = {
       bypassed: args.bypassed !== false
     }),
   renderProject: async (bridge, args) => bridge.renderProject(args),
-  renderStems: async (bridge, args) => bridge.renderStems(args)
+  renderStems: async (bridge, args) => bridge.renderStems(args),
+  // FX parameter control
+  getFxParameters: async (bridge, args) =>
+    bridge.getFxParameters({ trackId: await resolveTrackId(bridge, args), fxIndex: args.fxIndex }),
+  setFxParameter: async (bridge, args) =>
+    bridge.setFxParameter({
+      trackId: await resolveTrackId(bridge, args),
+      fxIndex: args.fxIndex,
+      paramIndex: args.paramIndex,
+      value: args.value
+    }),
+  setFxPreset: async (bridge, args) =>
+    bridge.setFxPreset({
+      trackId: await resolveTrackId(bridge, args),
+      fxIndex: args.fxIndex,
+      presetName: args.presetName
+    }),
+  // MIDI / instrument tracks
+  createMidiTrack: async (bridge, args) =>
+    bridge.createMidiTrack({
+      name: args.name,
+      color: args.color,
+      insertIndex: args.insertIndex,
+      midiChannel: args.midiChannel,
+      instrument: args.instrument
+    }),
+  // Peak meters
+  getTrackPeaks: async (bridge) => bridge.getTrackPeaks()
 };
 
 module.exports = function createActionRoutes(bridge) {

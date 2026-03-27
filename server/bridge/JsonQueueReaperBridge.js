@@ -606,6 +606,34 @@ class JsonQueueReaperBridge extends ReaperBridge {
     return this._sendCommand('toggleFxBypass', { trackId, fxIndex, bypassed });
   }
 
+  async getFxParameters({ trackId, fxIndex }) {
+    return this._sendCommand('getFxParameters', { trackId, fxIndex });
+  }
+
+  async setFxParameter({ trackId, fxIndex, paramIndex, value }) {
+    return this._sendCommand('setFxParameter', { trackId, fxIndex, paramIndex, value });
+  }
+
+  async setFxPreset({ trackId, fxIndex, presetName }) {
+    return this._sendCommand('setFxPreset', { trackId, fxIndex, presetName });
+  }
+
+  // ---------------------------------------------------------------------------
+  // MIDI / Instrument Tracks
+  // ---------------------------------------------------------------------------
+
+  async createMidiTrack({ name, color, insertIndex, midiChannel, instrument }) {
+    return this._sendCommand('createMidiTrack', { name, color, insertIndex, midiChannel, instrument });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Peak Meters
+  // ---------------------------------------------------------------------------
+
+  async getTrackPeaks() {
+    return this._sendCommand('getTrackPeaks');
+  }
+
   // ---------------------------------------------------------------------------
   // Undo / Redo
   // ---------------------------------------------------------------------------

@@ -573,6 +573,34 @@ class ReaperBridge {
     throw new Error('Not implemented: toggleFxBypass');
   }
 
+  async getFxParameters({ trackId, fxIndex }) {
+    throw new Error('Not implemented: getFxParameters');
+  }
+
+  async setFxParameter({ trackId, fxIndex, paramIndex, value }) {
+    throw new Error('Not implemented: setFxParameter');
+  }
+
+  async setFxPreset({ trackId, fxIndex, presetName }) {
+    throw new Error('Not implemented: setFxPreset');
+  }
+
+  // ---------------------------------------------------------------------------
+  // MIDI / Instrument Tracks
+  // ---------------------------------------------------------------------------
+
+  async createMidiTrack({ name, color, insertIndex, midiChannel, instrument }) {
+    throw new Error('Not implemented: createMidiTrack');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Peak Meters
+  // ---------------------------------------------------------------------------
+
+  async getTrackPeaks() {
+    throw new Error('Not implemented: getTrackPeaks');
+  }
+
   // ---------------------------------------------------------------------------
   // Rendering
   // ---------------------------------------------------------------------------

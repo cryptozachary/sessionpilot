@@ -1690,3 +1690,124 @@ body {
 .font-mono {
   font-family: var(--font-mono);
 }
+
+/* ---------------------------------------------------------------------------
+   Track Type Icons
+   --------------------------------------------------------------------------- */
+.track-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.track-type-icon.midi { background: #16a085; color: #fff; }
+.track-type-icon.instrument { background: #8e44ad; color: #fff; }
+.track-type-icon.folder { background: #2ecc71; color: #fff; }
+
+.track-badge.track-type-badge {
+  background: rgba(142, 68, 173, 0.3);
+  color: #bb86fc;
+  text-transform: capitalize;
+}
+
+/* ---------------------------------------------------------------------------
+   Track Meters (sidebar)
+   --------------------------------------------------------------------------- */
+.track-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 36px;
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-right: 6px;
+}
+.track-meter-bar {
+  height: 2px;
+  border-radius: 1px;
+  transition: width 0.08s linear;
+  max-width: 100%;
+  background: #27ae60;
+}
+
+/* ---------------------------------------------------------------------------
+   Selected Track Panel Meter
+   --------------------------------------------------------------------------- */
+.track-panel-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 8px;
+}
+.meter-channel {
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.meter-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  transition: width 0.08s linear;
+  background: linear-gradient(90deg, #27ae60 0%, #f1c40f 70%, #e74c3c 95%);
+}
+
+/* ---------------------------------------------------------------------------
+   FX Parameter Sliders
+   --------------------------------------------------------------------------- */
+.track-fx-item.expandable {
+  cursor: pointer;
+}
+.track-fx-item.expandable:hover {
+  background: rgba(255,255,255,0.06);
+}
+.fx-params-container {
+  padding: 0 4px 4px;
+}
+.fx-param-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+.fx-param-name {
+  width: 80px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx-param-slider {
+  flex: 1;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+  outline: none;
+}
+.fx-param-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  cursor: pointer;
+}
+.fx-param-value {
+  width: 50px;
+  flex-shrink: 0;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 10px;
+}

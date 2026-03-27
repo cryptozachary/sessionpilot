@@ -37,6 +37,12 @@ window.SessionPilot.API = (() => {
 
     // Actions
     executeAction: (payload) => request('POST', '/api/actions/execute', payload),
-    previewAction: (workflow, args) => request('POST', '/api/actions/preview', { workflow, args })
+    previewAction: (workflow, args) => request('POST', '/api/actions/preview', { workflow, args }),
+
+    // Session Templates
+    getSessionTemplates: () => request('GET', '/api/session-templates'),
+    saveSessionTemplate: (name, description) => request('POST', '/api/session-templates', { name, description }),
+    loadSessionTemplate: (id) => request('POST', `/api/session-templates/${id}/load`),
+    deleteSessionTemplate: (id) => request('DELETE', `/api/session-templates/${id}`)
   };
 })();

@@ -1,7 +1,8 @@
 // SessionPilot for REAPER - WebSocket Server
-// Broadcasts session state updates and action events to connected clients.
+// Broadcasts session state updates, peak meters, and action events to connected clients.
 
 const WebSocket = require('ws');
+const fs = require('fs');
 
 module.exports = function setupWebSocket(server, bridge) {
   const wss = new WebSocket.Server({ server });
@@ -46,9 +47,11 @@ module.exports = function setupWebSocket(server, bridge) {
     }
   }
 
-  // Poll and broadcast session state every 2 seconds
-  const pollInterval = setInterval(async () => {
-    if (wss.clients.size === 0) return; // No clients, skip polling
+  /**
+   * Broadcast full session state to all clients.
+   */
+  async function broadcastSessionState() {
+    if (wss.clients.size === 0) return;
     try {
       const [session, tracks, selected] = await Promise.all([
         bridge.getProjectSummary(),
@@ -63,7 +66,44 @@ module.exports = function setupWebSocket(server, bridge) {
     } catch (e) {
       broadcast('error', { message: 'Failed to poll session state' });
     }
-  }, 2000);
+  }
+
+  // Poll and broadcast session state (fallback interval)
+  const pollInterval = setInterval(broadcastSessionState, 2000);
+
+  // File-watch based state push for JsonQueueReaperBridge (much faster than polling)
+  let fileWatcher = null;
+  let watchDebounceTimer = null;
+  if (bridge._stateFile) {
+    try {
+      fileWatcher = fs.watch(bridge._stateFile, { persistent: false }, (eventType) => {
+        if (eventType === 'change') {
+          if (watchDebounceTimer) clearTimeout(watchDebounceTimer);
+          watchDebounceTimer = setTimeout(broadcastSessionState, 100);
+        }
+      });
+      fileWatcher.on('error', () => {
+        // Non-fatal: fall back to interval polling
+      });
+    } catch (e) {
+      // fs.watch not available or file doesn't exist yet — fall back to polling
+    }
+  }
+
+  // Peak meter broadcast — faster interval for level meters
+  const peakPollInterval = setInterval(async () => {
+    if (wss.clients.size === 0) return;
+    try {
+      if (typeof bridge.getTrackPeaks === 'function') {
+        const peaks = await bridge.getTrackPeaks();
+        if (peaks.ok && peaks.data) {
+          broadcast('peak_update', peaks.data);
+        }
+      }
+    } catch (e) {
+      // Non-critical — skip this cycle
+    }
+  }, 250);
 
   // Heartbeat: ping every 15 seconds, terminate stale connections after 30s
   const HEARTBEAT_INTERVAL = 15000;
@@ -114,7 +154,9 @@ module.exports = function setupWebSocket(server, bridge) {
   // Clean up on server close
   wss.on('close', () => {
     clearInterval(pollInterval);
+    clearInterval(peakPollInterval);
     clearInterval(heartbeatInterval);
+    if (fileWatcher) fileWatcher.close();
   });
 
   return { broadcast, wss };

@@ -2,6 +2,7 @@
 // Express router for session state and REAPER data queries.
 
 const workflowService = require('../services/workflowService');
+const templateService = require('../services/templateService');
 
 module.exports = function createSessionRoutes(bridge) {
   const router = require('express').Router();
@@ -145,10 +146,72 @@ module.exports = function createSessionRoutes(bridge) {
     }
   });
 
+  // GET /api/tracks/:trackId/fx/:fxIndex/params - get FX parameters
+  router.get('/api/tracks/:trackId/fx/:fxIndex/params', async (req, res) => {
+    try {
+      const { trackId } = req.params;
+      const fxIndex = parseInt(req.params.fxIndex, 10);
+      const result = await bridge.getFxParameters({ trackId, fxIndex });
+      res.json(result);
+    } catch (e) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
   // GET /api/workflows - available workflows
   router.get('/api/workflows', (req, res) => {
     try {
       const result = workflowService.listWorkflows();
+      res.json({ ok: true, data: result });
+    } catch (e) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Session Templates
+  // ---------------------------------------------------------------------------
+
+  router.get('/api/session-templates', async (req, res) => {
+    try {
+      const templates = await templateService.listTemplates();
+      res.json({ ok: true, data: templates });
+    } catch (e) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
+  router.get('/api/session-templates/:id', async (req, res) => {
+    try {
+      const template = await templateService.getTemplate(req.params.id);
+      res.json({ ok: true, data: template });
+    } catch (e) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
+  router.post('/api/session-templates', async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      const template = await templateService.saveTemplate(bridge, name, description);
+      res.json({ ok: true, data: template });
+    } catch (e) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
+  router.post('/api/session-templates/:id/load', async (req, res) => {
+    try {
+      const result = await templateService.loadTemplate(bridge, req.params.id);
+      res.json({ ok: true, data: result });
+    } catch (e) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
+  router.delete('/api/session-templates/:id', async (req, res) => {
+    try {
+      const result = await templateService.deleteTemplate(req.params.id);
       res.json({ ok: true, data: result });
     } catch (e) {
       res.json({ ok: false, error: e.message });

@@ -130,6 +130,23 @@ window.SessionPilot.QuickActions = (() => {
       icon: '\u{1F4E4}'
     },
     {
+      label: 'MIDI Track',
+      actionType: 'createMidiTrack',
+      args: { name: 'MIDI Track' },
+      needsConfirm: false,
+      icon: '\u{1F3B9}'
+    },
+    {
+      label: 'Save Template',
+      workflow: null,
+      actionType: null,
+      args: {},
+      needsConfirm: false,
+      icon: '\u{1F4BE}',
+      promptForArgs: true,
+      promptText: 'save session template as '
+    },
+    {
       label: 'Undo',
       actionType: 'undo',
       args: {},

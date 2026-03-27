@@ -81,8 +81,8 @@ class MockReaperBridge extends ReaperBridge {
       createTrackSummary({
         id: uuidv4(),
         index: 1,
-        name: 'Bass DI',
-        color: '#3498db',
+        name: 'Bass Synth',
+        color: '#16a085',
         isSelected: false,
         isMuted: false,
         isSolo: false,
@@ -92,12 +92,15 @@ class MockReaperBridge extends ReaperBridge {
         outputLabel: 'Master',
         folderDepth: 0,
         parentTrackId: null,
-        fxNames: [],
+        fxNames: ['ReaSynth'],
         itemCount: 2,
         volume: 1.0,
         pan: 0.0,
         notes: [],
-        takes: []
+        takes: [],
+        trackType: 'instrument',
+        midiInput: 'All Channels',
+        instrumentPlugin: 'ReaSynth'
       }),
       createTrackSummary({
         id: uuidv4(),
@@ -1074,6 +1077,122 @@ class MockReaperBridge extends ReaperBridge {
     return this._result(true, { trackId, fxIndex, bypassed: bypassed !== false }, [], [], {
       bridgeType: BRIDGE_TYPES.MOCK
     });
+  }
+
+  async getFxParameters({ trackId, fxIndex }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+    const idx = fxIndex || 0;
+    if (!track.fxNames || idx >= track.fxNames.length) {
+      return this._result(false, null, [], ['FX index out of range'], { bridgeType: BRIDGE_TYPES.MOCK });
+    }
+    const fxName = track.fxNames[idx];
+    const mockParams = this._getMockFxParams(fxName);
+    return this._result(true, {
+      trackId, fxIndex: idx, fxName, paramCount: mockParams.length, params: mockParams
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  _getMockFxParams(fxName) {
+    const presets = {
+      'ReaEQ': [
+        { index: 0, name: 'Band 1 Freq', value: 0.3, minValue: 0, maxValue: 1, formattedValue: '300 Hz' },
+        { index: 1, name: 'Band 1 Gain', value: 0.5, minValue: 0, maxValue: 1, formattedValue: '0.0 dB' },
+        { index: 2, name: 'Band 1 Q', value: 0.5, minValue: 0, maxValue: 1, formattedValue: '1.0' },
+        { index: 3, name: 'Band 2 Freq', value: 0.6, minValue: 0, maxValue: 1, formattedValue: '2.0 kHz' },
+        { index: 4, name: 'Band 2 Gain', value: 0.5, minValue: 0, maxValue: 1, formattedValue: '0.0 dB' },
+        { index: 5, name: 'Band 2 Q', value: 0.5, minValue: 0, maxValue: 1, formattedValue: '1.0' }
+      ],
+      'ReaComp': [
+        { index: 0, name: 'Threshold', value: 0.7, minValue: 0, maxValue: 1, formattedValue: '-12.0 dB' },
+        { index: 1, name: 'Ratio', value: 0.3, minValue: 0, maxValue: 1, formattedValue: '4:1' },
+        { index: 2, name: 'Attack', value: 0.2, minValue: 0, maxValue: 1, formattedValue: '5 ms' },
+        { index: 3, name: 'Release', value: 0.4, minValue: 0, maxValue: 1, formattedValue: '100 ms' },
+        { index: 4, name: 'Makeup', value: 0.5, minValue: 0, maxValue: 1, formattedValue: '0.0 dB' }
+      ],
+      'ReaDelay': [
+        { index: 0, name: 'Delay', value: 0.35, minValue: 0, maxValue: 1, formattedValue: '250 ms' },
+        { index: 1, name: 'Feedback', value: 0.3, minValue: 0, maxValue: 1, formattedValue: '30%' },
+        { index: 2, name: 'Mix', value: 0.25, minValue: 0, maxValue: 1, formattedValue: '25%' }
+      ]
+    };
+    return presets[fxName] || [
+      { index: 0, name: 'Parameter 1', value: 0.5, minValue: 0, maxValue: 1, formattedValue: '50%' },
+      { index: 1, name: 'Parameter 2', value: 0.5, minValue: 0, maxValue: 1, formattedValue: '50%' }
+    ];
+  }
+
+  async setFxParameter({ trackId, fxIndex, paramIndex, value }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+    return this._result(true, {
+      trackId, fxIndex, paramIndex, value,
+      paramName: `Param ${paramIndex}`,
+      formattedValue: `${Math.round(value * 100)}%`
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async setFxPreset({ trackId, fxIndex, presetName }) {
+    await this._simulateLatency();
+    const track = this._findTrack(trackId);
+    if (!track) return this._trackNotFound(trackId);
+    return this._result(true, { trackId, fxIndex, preset: presetName }, [], [], {
+      bridgeType: BRIDGE_TYPES.MOCK
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // MIDI / Instrument Tracks
+  // ---------------------------------------------------------------------------
+
+  async createMidiTrack({ name, color, insertIndex, midiChannel, instrument }) {
+    await this._simulateLatency();
+    const index = insertIndex !== undefined ? insertIndex : this._tracks.length;
+    const trackType = instrument ? 'instrument' : 'midi';
+    const newTrack = createTrackSummary({
+      id: uuidv4(),
+      index,
+      name: name || (instrument ? 'Instrument' : 'MIDI Track'),
+      color: color || '#16a085',
+      isSelected: false,
+      isMuted: false,
+      isSolo: false,
+      isArmed: false,
+      monitoringOn: false,
+      inputLabel: null,
+      outputLabel: 'Master',
+      folderDepth: 0,
+      parentTrackId: null,
+      fxNames: instrument ? [instrument] : [],
+      itemCount: 0,
+      trackType,
+      midiInput: midiChannel ? `Channel ${midiChannel}` : 'All Channels',
+      instrumentPlugin: instrument || null
+    });
+
+    if (index >= this._tracks.length) {
+      this._tracks.push(newTrack);
+    } else {
+      this._tracks.splice(index, 0, newTrack);
+    }
+    this._tracks.forEach((t, i) => { t.index = i; });
+    return this._result(true, newTrack, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Peak Meters
+  // ---------------------------------------------------------------------------
+
+  async getTrackPeaks() {
+    const isActive = this._transportState === 'playing' || this._transportState === 'recording';
+    const peaks = this._tracks.map(t => ({
+      trackIndex: t.index,
+      peakL: isActive ? Math.random() * 0.7 + 0.05 : 0,
+      peakR: isActive ? Math.random() * 0.7 + 0.05 : 0
+    }));
+    return this._result(true, { peaks }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
   }
 
   // ---------------------------------------------------------------------------
