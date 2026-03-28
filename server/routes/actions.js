@@ -157,6 +157,22 @@ const DIRECT_ACTION_MAP = {
       midiChannel: args.midiChannel,
       instrument: args.instrument
     }),
+  // MIDI composition
+  insertMidiNotes: async (bridge, args) =>
+    bridge.insertMidiNotes({
+      trackId: args.trackId || await resolveTrackId(bridge, args),
+      notes: args.notes,
+      startPositionQN: args.startPositionQN,
+      lengthQN: args.lengthQN,
+      itemName: args.itemName
+    }),
+  createMidiItem: async (bridge, args) =>
+    bridge.createMidiItem({
+      trackId: args.trackId || await resolveTrackId(bridge, args),
+      startPositionQN: args.startPositionQN,
+      lengthQN: args.lengthQN,
+      itemName: args.itemName
+    }),
   // Peak meters
   getTrackPeaks: async (bridge) => bridge.getTrackPeaks()
 };

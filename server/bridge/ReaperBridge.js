@@ -593,6 +593,14 @@ class ReaperBridge {
     throw new Error('Not implemented: createMidiTrack');
   }
 
+  async insertMidiNotes({ trackId, notes, startPositionQN, lengthQN, itemName }) {
+    throw new Error('Not implemented: insertMidiNotes');
+  }
+
+  async createMidiItem({ trackId, startPositionQN, lengthQN, itemName }) {
+    throw new Error('Not implemented: createMidiItem');
+  }
+
   // ---------------------------------------------------------------------------
   // Peak Meters
   // ---------------------------------------------------------------------------

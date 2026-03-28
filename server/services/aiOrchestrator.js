@@ -99,6 +99,34 @@ const INTENT_PATTERNS = [
     intent: 'export_bounce', workflow: 'exportBounce', actionType: 'needs_confirmation'
   },
 
+  // MIDI composition (must be before transport so "play a scale" doesn't match transport_play)
+  {
+    patterns: [
+      /chord\s*progression/i, /play\s*(some\s*)?chords/i, /write\s*(some\s*)?chords/i,
+      /create\s*(a\s*)?chord\s*progression/i, /add\s*(a\s*)?chord\s*progression/i,
+      /chords?\s*(with|using)\s/i, /progression\s*(with|using|in)\s/i,
+      /chord\s*pattern/i
+    ],
+    intent: 'create_chord_progression', actionType: 'safe_action'
+  },
+  {
+    patterns: [
+      /scale\s*run/i, /play\s+.*\bscale\b/i, /write\s+.*\bscale\b/i,
+      /create\s+.*\bscale\b/i, /add\s+.*\bscale\b/i,
+      /run\s*(the\s*)?(major|minor|pentatonic|blues|chromatic|dorian|mixolydian)/i,
+      /\b(major|minor|pentatonic|blues|dorian|mixolydian|lydian|phrygian)\s*scale/i
+    ],
+    intent: 'create_scale_run', actionType: 'safe_action'
+  },
+  {
+    patterns: [
+      /write\s*(some\s*)?midi\s*notes/i, /insert\s*midi\s*notes/i,
+      /add\s*midi\s*notes/i, /create\s*midi\s*notes/i,
+      /put\s*(some\s*)?notes\s*(on|in)/i, /write\s*notes\s/i
+    ],
+    intent: 'insert_midi_notes', actionType: 'safe_action'
+  },
+
   // Transport controls (stop must be before play so "stop playback" doesn't match play)
   {
     patterns: [/\bstop\s*(play|record|it|the|every)?\b/i, /\bhit\s*stop\b/i, /\bstop\s*playback\b/i, /\bpress\s*stop\b/i],
@@ -378,6 +406,80 @@ function extractArgs(message, intent) {
       const adDb = message.match(/adlib\s*(?:at|to)?\s*-(\d+)\s*dB/i);
       if (adDb && !adPct) rmArgs.adlibVolume = Math.pow(10, -parseInt(adDb[1], 10) / 20);
       return rmArgs;
+    }
+
+    case 'create_chord_progression': {
+      const cpArgs = {};
+      // Extract chord names: prefer "with/using" as delimiter, fall back to "chords:" or generic
+      const withMatch = message.match(/(?:with|using)\s+(.+)/i);
+      const colonMatch = !withMatch && message.match(/(?:chords?|progression)\s*[:]\s*(.+)/i);
+      const chordSection = withMatch || colonMatch;
+      if (chordSection) {
+        const raw = chordSection[1]
+          .replace(/\band\b/gi, ',')
+          .replace(/\bthen\b/gi, ',')
+          .split(/[,]+/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        cpArgs.chordNames = raw;
+      } else {
+        // Find chord-like tokens anywhere in the message
+        const chordPattern = /\b([A-G][#b]?\s*(?:maj|min|m|dim|aug|sus|add|dom|7|9|11|13|major|minor|diminished|augmented|suspended)*(?:\d*)?)\b/gi;
+        const found = [];
+        let m;
+        while ((m = chordPattern.exec(message)) !== null) {
+          found.push(m[1].trim());
+        }
+        if (found.length > 0) cpArgs.chordNames = found;
+      }
+      // Beats per chord
+      const bpcMatch = message.match(/(\d+)\s*beats?\s*(per|each)/i);
+      if (bpcMatch) cpArgs.beatsPerChord = parseInt(bpcMatch[1], 10);
+      if (/whole\s*notes?/i.test(message)) cpArgs.beatsPerChord = 4;
+      if (/half\s*notes?/i.test(message)) cpArgs.beatsPerChord = 2;
+      if (/quarter\s*notes?/i.test(message)) cpArgs.beatsPerChord = 1;
+      // Octave
+      const octMatch = message.match(/octave\s*(\d)/i);
+      if (octMatch) cpArgs.octave = parseInt(octMatch[1], 10);
+      // Velocity
+      if (/\bsoft\b|\bquiet\b|\bpiano\b/i.test(message)) cpArgs.velocity = 60;
+      if (/\bloud\b|\bhard\b|\bforte\b/i.test(message)) cpArgs.velocity = 120;
+      const velMatch = message.match(/velocity\s*(\d+)/i);
+      if (velMatch) cpArgs.velocity = parseInt(velMatch[1], 10);
+      return cpArgs;
+    }
+
+    case 'create_scale_run': {
+      const srArgs = {};
+      // Normalize sharp/flat words before extraction (keep trailing space for regex)
+      const normalizedMsg = message.replace(/\s*\bsharp\b/gi, '#').replace(/\s*\bflat\b/gi, 'b');
+      // Extract scale name: "C major scale", "A minor pentatonic", "D dorian"
+      // Note letter MUST be followed by a scale quality keyword to avoid matching "a" as article
+      const scaleMatch = normalizedMsg.match(
+        /\b([A-Ga-g][#b]?)\s+(minor\s*pentatonic|major\s*pentatonic|harmonic\s*minor|melodic\s*minor|whole\s*tone|major|minor|pentatonic|blues|chromatic|dorian|mixolydian|lydian|phrygian|locrian|aeolian|ionian|bebop)/i
+      );
+      if (scaleMatch) {
+        srArgs.root = scaleMatch[1].charAt(0).toUpperCase() + scaleMatch[1].slice(1);
+        srArgs.scaleType = scaleMatch[2].trim();
+        srArgs.scaleName = `${srArgs.root} ${srArgs.scaleType}`;
+      }
+      const octMatch = message.match(/octave\s*(\d)/i);
+      if (octMatch) srArgs.octave = parseInt(octMatch[1], 10);
+      const bpnMatch = message.match(/(\d+)\s*beats?\s*(per|each)\s*note/i);
+      if (bpnMatch) srArgs.beatsPerNote = parseInt(bpnMatch[1], 10);
+      return srArgs;
+    }
+
+    case 'insert_midi_notes': {
+      const mnArgs = {};
+      const notePattern = /\b([A-G][#b]?\d)\b/gi;
+      const found = [];
+      let m;
+      while ((m = notePattern.exec(message)) !== null) {
+        found.push(m[1]);
+      }
+      if (found.length > 0) mnArgs.noteNames = found;
+      return mnArgs;
     }
 
     case 'create_midi_track': {
@@ -838,6 +940,174 @@ async function handleDirectAction(bridge, matched, message) {
         "Hey! I'm your session engineer. I can set up vocal tracks, prepare punch-ins, troubleshoot monitoring, organize your session \u2014 you name it. What are we working on?",
         [],
         'advice',
+        baseContext
+      );
+    }
+
+    case 'create_chord_progression': {
+      const musicTheory = require('./musicTheory');
+
+      if (!args.chordNames || args.chordNames.length === 0) {
+        return buildResponse(
+          "What chords do you want? Try: \"chord progression with C, Am, F, G\" or \"chords using C major and E minor\".",
+          [], 'advice', baseContext
+        );
+      }
+
+      let normalizedChords;
+      try {
+        normalizedChords = args.chordNames.map(name => musicTheory.normalizeChordName(name));
+        normalizedChords.forEach(name => musicTheory.resolveChord(name, args.octave || 4));
+      } catch (e) {
+        return buildResponse(
+          `Couldn't resolve one of those chords: ${e.message}. Try standard names like C, Am, Dm7, G7.`,
+          [], 'advice', baseContext
+        );
+      }
+
+      const progression = musicTheory.buildChordProgression(normalizedChords, {
+        octave: args.octave || 4,
+        beatsPerChord: args.beatsPerChord || 4,
+        velocity: args.velocity || 96,
+        channel: 0
+      });
+
+      const allNotes = musicTheory.flattenProgression(progression);
+      const chordDisplay = progression.map(c => c.displayName).join(' — ');
+      const totalBeats = progression.reduce((sum, c) => sum + c.durationQN, 0);
+
+      const selected = await bridge.getSelectedTrack();
+      const hasTrack = selected.ok && selected.data;
+      const trackDesc = hasTrack
+        ? `on "${selected.data.name || 'Track ' + selected.data.index}"`
+        : 'on a new MIDI track';
+
+      const actions = [];
+      if (!hasTrack) {
+        actions.push({
+          type: 'createMidiTrack',
+          args: { name: 'Chords' },
+          label: 'Create MIDI track "Chords"',
+          requiresConfirmation: false
+        });
+      }
+      actions.push({
+        type: 'insertMidiNotes',
+        args: {
+          target: hasTrack ? 'selected' : undefined,
+          notes: allNotes,
+          itemName: `Chords: ${chordDisplay}`,
+          startPositionQN: null
+        },
+        label: `Write ${chordDisplay} (${allNotes.length} notes, ${totalBeats} beats)`,
+        requiresConfirmation: false
+      });
+
+      return buildResponse(
+        `I'll write a **${chordDisplay}** chord progression ${trackDesc} — ${allNotes.length} notes across ${totalBeats} beats.`,
+        actions,
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'create_scale_run': {
+      const musicTheory = require('./musicTheory');
+
+      if (!args.scaleName) {
+        return buildResponse(
+          "Which scale? Try \"C major scale\", \"A minor pentatonic\", or \"D dorian\".",
+          [], 'advice', baseContext
+        );
+      }
+
+      let scaleNotes;
+      try {
+        scaleNotes = musicTheory.buildScaleRun(args.scaleName, {
+          octave: args.octave || 4,
+          beatsPerNote: args.beatsPerNote || 1,
+          velocity: args.velocity || 80,
+          channel: 0
+        });
+      } catch (e) {
+        return buildResponse(
+          `Couldn't resolve that scale: ${e.message}. Try \"C major\", \"A minor pentatonic\", etc.`,
+          [], 'advice', baseContext
+        );
+      }
+
+      const allNotes = musicTheory.flattenNoteSequence(scaleNotes);
+      const selected = await bridge.getSelectedTrack();
+      const hasTrack = selected.ok && selected.data;
+      const trackDesc = hasTrack ? `on "${selected.data.name}"` : 'on a new MIDI track';
+
+      const actions = [];
+      if (!hasTrack) {
+        actions.push({
+          type: 'createMidiTrack',
+          args: { name: args.scaleName + ' Scale' },
+          label: `Create MIDI track "${args.scaleName} Scale"`,
+          requiresConfirmation: false
+        });
+      }
+      actions.push({
+        type: 'insertMidiNotes',
+        args: {
+          target: hasTrack ? 'selected' : undefined,
+          notes: allNotes,
+          itemName: `${args.scaleName} Scale Run`
+        },
+        label: `Write ${args.scaleName} scale (${allNotes.length} notes)`,
+        requiresConfirmation: false
+      });
+
+      return buildResponse(
+        `I'll write a **${args.scaleName}** scale run ${trackDesc} — ${allNotes.length} notes.`,
+        actions,
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'insert_midi_notes': {
+      const musicTheory = require('./musicTheory');
+
+      if (!args.noteNames || args.noteNames.length === 0) {
+        return buildResponse(
+          "Which notes? Specify like \"C4 E4 G4\" or \"notes D3, F#3, A3\".",
+          [], 'advice', baseContext
+        );
+      }
+
+      let allNotes;
+      try {
+        allNotes = musicTheory.buildMelodyFromNotes(args.noteNames).map(n => ({
+          pitch: n.pitch, velocity: n.velocity, channel: n.channel,
+          startQN: n.startQN, durationQN: n.durationQN
+        }));
+      } catch (e) {
+        return buildResponse(
+          `Couldn't resolve those notes: ${e.message}. Use format like C4, E4, G4.`,
+          [], 'advice', baseContext
+        );
+      }
+
+      const selected = await bridge.getSelectedTrack();
+      const hasTrack = selected.ok && selected.data;
+
+      return buildResponse(
+        `I'll write ${allNotes.length} MIDI notes: ${args.noteNames.join(', ')}.`,
+        [{
+          type: 'insertMidiNotes',
+          args: {
+            target: hasTrack ? 'selected' : undefined,
+            notes: allNotes,
+            itemName: 'MIDI Notes'
+          },
+          label: `Insert ${allNotes.length} MIDI notes`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
         baseContext
       );
     }

@@ -626,6 +626,14 @@ class JsonQueueReaperBridge extends ReaperBridge {
     return this._sendCommand('createMidiTrack', { name, color, insertIndex, midiChannel, instrument });
   }
 
+  async insertMidiNotes({ trackId, notes, startPositionQN, lengthQN, itemName }) {
+    return this._sendCommand('insertMidiNotes', { trackId, notes, startPositionQN, lengthQN, itemName });
+  }
+
+  async createMidiItem({ trackId, startPositionQN, lengthQN, itemName }) {
+    return this._sendCommand('createMidiItem', { trackId, startPositionQN, lengthQN, itemName });
+  }
+
   // ---------------------------------------------------------------------------
   // Peak Meters
   // ---------------------------------------------------------------------------

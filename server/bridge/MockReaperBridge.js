@@ -1182,6 +1182,51 @@ class MockReaperBridge extends ReaperBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // MIDI Composition
+  // ---------------------------------------------------------------------------
+
+  async insertMidiNotes({ trackId, notes, startPositionQN, lengthQN, itemName }) {
+    await this._simulateLatency();
+    const track = trackId ? this._findTrack(trackId) : this._tracks.find(t => t.isSelected);
+    if (!track) return this._trackNotFound(trackId || 'selected');
+
+    const noteCount = (notes || []).length;
+    const totalDurationQN = lengthQN || (notes || []).reduce((max, n) => {
+      return Math.max(max, (n.startQN || 0) + (n.durationQN || 1));
+    }, 0);
+
+    track.itemCount = (track.itemCount || 0) + 1;
+
+    return this._result(true, {
+      trackId: track.id,
+      noteCount,
+      startPosition: (startPositionQN || 0) * 0.5,
+      lengthSeconds: totalDurationQN * 0.5,
+      itemName: itemName || '',
+      notes: (notes || []).map(n => ({
+        pitch: n.pitch,
+        velocity: n.velocity || 96,
+        channel: n.channel || 0,
+        startQN: n.startQN || 0,
+        durationQN: n.durationQN || 1
+      }))
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  async createMidiItem({ trackId, startPositionQN, lengthQN, itemName }) {
+    await this._simulateLatency();
+    const track = trackId ? this._findTrack(trackId) : this._tracks.find(t => t.isSelected);
+    if (!track) return this._trackNotFound(trackId || 'selected');
+    track.itemCount = (track.itemCount || 0) + 1;
+    return this._result(true, {
+      trackId: track.id,
+      startPosition: (startPositionQN || 0) * 0.5,
+      lengthSeconds: (lengthQN || 4) * 0.5,
+      itemName: itemName || ''
+    }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
+  }
+
+  // ---------------------------------------------------------------------------
   // Peak Meters
   // ---------------------------------------------------------------------------
 

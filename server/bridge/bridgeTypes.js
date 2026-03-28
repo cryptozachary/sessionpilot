@@ -121,6 +121,8 @@ const CONFIRMATION_POLICY = {
 
   // MIDI / instrument tracks
   createMidiTrack: RISK_LEVELS.MEDIUM,
+  insertMidiNotes: RISK_LEVELS.MEDIUM,
+  createMidiItem: RISK_LEVELS.MEDIUM,
 
   // Track peaks
   getTrackPeaks: RISK_LEVELS.LOW,

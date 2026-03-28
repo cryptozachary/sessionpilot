@@ -1150,6 +1150,137 @@ commands.createMidiTrack = function(args)
 end
 
 ---------------------------------------------------------------------------
+-- MIDI Composition: Insert MIDI notes into a new or existing MIDI item
+---------------------------------------------------------------------------
+commands.insertMidiNotes = function(args)
+  -- Find the target track
+  local track = nil
+  if args.trackId then
+    track = findTrackById(args.trackId)
+  else
+    -- Fall back to selected track
+    track = reaper.GetSelectedTrack(0, 0)
+  end
+  if not track then return { ok = false, errors = {"Track not found. Select a MIDI track or provide trackId."} } end
+
+  local notes = args.notes
+  if not notes or #notes == 0 then
+    return { ok = false, errors = {"No notes provided"} }
+  end
+
+  -- Determine item start position in quarter notes
+  local itemStartQN = args.startPositionQN
+  if itemStartQN == nil then
+    -- Use edit cursor position, convert to QN
+    local cursorTime = reaper.GetCursorPosition()
+    itemStartQN = reaper.TimeMap2_timeToQN(0, cursorTime)
+  end
+
+  -- Find the total length needed from the note data
+  local maxEndQN = 0
+  for _, note in ipairs(notes) do
+    local noteEnd = (note.startQN or 0) + (note.durationQN or 1)
+    if noteEnd > maxEndQN then maxEndQN = noteEnd end
+  end
+
+  local itemLengthQN = args.lengthQN or maxEndQN
+  local itemStartTime = reaper.TimeMap2_QNToTime(0, itemStartQN)
+  local itemEndTime = reaper.TimeMap2_QNToTime(0, itemStartQN + itemLengthQN)
+
+  -- Create a new MIDI item on the track
+  local item = reaper.CreateNewMIDIItemInProj(track, itemStartTime, itemEndTime)
+  if not item then
+    return { ok = false, errors = {"Failed to create MIDI item"} }
+  end
+
+  local take = reaper.GetMediaItemTake(item, 0)
+  if not take then
+    return { ok = false, errors = {"Failed to get take from MIDI item"} }
+  end
+
+  -- Set item/take name
+  if args.itemName then
+    reaper.GetSetMediaItemTakeInfo_String(take, "P_NAME", args.itemName, true)
+  end
+
+  -- Insert each note
+  local insertedCount = 0
+  for _, note in ipairs(notes) do
+    local noteStartQN = itemStartQN + (note.startQN or 0)
+    local noteEndQN = noteStartQN + (note.durationQN or 1)
+    local startPPQ = reaper.MIDI_GetPPQPosFromProjQN(take, noteStartQN)
+    local endPPQ = reaper.MIDI_GetPPQPosFromProjQN(take, noteEndQN)
+    local pitch = note.pitch or 60
+    local vel = note.velocity or 96
+    local chan = note.channel or 0
+
+    reaper.MIDI_InsertNote(take, false, false, math.floor(startPPQ), math.floor(endPPQ), chan, pitch, vel)
+    insertedCount = insertedCount + 1
+  end
+
+  reaper.MIDI_Sort(take)
+  reaper.UpdateItemInProject(item)
+
+  return {
+    ok = true,
+    data = {
+      trackId = args.trackId or "selected",
+      noteCount = insertedCount,
+      startPosition = itemStartTime,
+      lengthSeconds = itemEndTime - itemStartTime,
+      itemName = args.itemName or ""
+    }
+  }
+end
+
+---------------------------------------------------------------------------
+-- MIDI Composition: Create an empty MIDI item on a track
+---------------------------------------------------------------------------
+commands.createMidiItem = function(args)
+  local track = nil
+  if args.trackId then
+    track = findTrackById(args.trackId)
+  else
+    track = reaper.GetSelectedTrack(0, 0)
+  end
+  if not track then return { ok = false, errors = {"Track not found"} } end
+
+  local startQN = args.startPositionQN
+  if startQN == nil then
+    local cursorTime = reaper.GetCursorPosition()
+    startQN = reaper.TimeMap2_timeToQN(0, cursorTime)
+  end
+
+  local lengthQN = args.lengthQN or 4
+  local startTime = reaper.TimeMap2_QNToTime(0, startQN)
+  local endTime = reaper.TimeMap2_QNToTime(0, startQN + lengthQN)
+
+  local item = reaper.CreateNewMIDIItemInProj(track, startTime, endTime)
+  if not item then
+    return { ok = false, errors = {"Failed to create MIDI item"} }
+  end
+
+  if args.itemName then
+    local take = reaper.GetMediaItemTake(item, 0)
+    if take then
+      reaper.GetSetMediaItemTakeInfo_String(take, "P_NAME", args.itemName, true)
+    end
+  end
+
+  reaper.UpdateItemInProject(item)
+
+  return {
+    ok = true,
+    data = {
+      trackId = args.trackId or "selected",
+      startPosition = startTime,
+      lengthSeconds = endTime - startTime,
+      itemName = args.itemName or ""
+    }
+  }
+end
+
+---------------------------------------------------------------------------
 -- FX Parameter Control
 ---------------------------------------------------------------------------
 commands.getFxParameters = function(args)
