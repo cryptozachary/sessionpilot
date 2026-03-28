@@ -10,7 +10,14 @@ AI Recording Engineer Assistant for REAPER DAW. SessionPilot provides a natural 
 - Volume and pan control via voice commands, chat, or UI sliders
 - Vocal session setup workflows (lead, doubles, adlibs, full stack)
 - Punch-in and loop-punch preparation with pre-roll
-- FX chain management (insert, remove, bypass plugins per track)
+- FX chain management (insert, remove, bypass, and parameter control per track)
+- FX parameter control with real-time sliders (EQ freq, compressor threshold, etc.)
+- MIDI/instrument track creation with automatic input routing
+- MIDI composition via natural language — chord progressions, scale runs, and note entry
+- Music theory engine powered by [tonal](https://github.com/tonaljs/tonal) (chords, scales, voicings)
+- Session template system — save and restore full session configurations
+- Peak meter visualization (per-track sidebar meters and selected track stereo meter)
+- Track type detection and display (audio, MIDI, instrument, folder)
 - Batch recording setup (playlist-style multi-song sessions)
 - Export/bounce workflows (mix, stems, or both)
 - Marker navigation ("go to chorus", "jump to verse 2")
@@ -24,7 +31,7 @@ AI Recording Engineer Assistant for REAPER DAW. SessionPilot provides a natural 
 - Command chaining ("arm track then hit record")
 - Action queue for sequential command execution
 - Voice command help overlay (press ? or click help button)
-- Real-time session state display via WebSocket
+- Real-time session state display via WebSocket with file-change-driven updates
 - Optional Claude LLM fallback for ambiguous messages
 - Context-aware fallback suggestions based on session state
 
@@ -47,7 +54,8 @@ npm start
 +----------------------------------+-----------------------------------+
 |                       Express Backend                                |
 |  Chat Orchestrator -> AI Orchestrator (regex) -> LLM Planner (Claude)|
-|  Workflow Service (17 workflows) | Action Routes (56+ bridge methods)|
+|  Workflow Service (17 workflows) | Music Theory | Template Service    |
+|  Action Routes (60+ bridge methods)                                  |
 +----------------------------------+-----------------------------------+
                                    | Bridge Interface
 +----------------------------------+-----------------------------------+
@@ -64,7 +72,7 @@ npm start
 
 - `server/` - Express backend
   - `bridge/` - REAPER bridge abstraction and implementations
-  - `services/` - AI orchestrator, workflow service, action log
+  - `services/` - AI orchestrator, workflow service, music theory, template service, action log
   - `workflows/` - Individual workflow handlers
   - `routes/` - REST API endpoints
   - `models/` - Data model factories
@@ -117,16 +125,23 @@ Extend `ReaperBridge` base class and implement all methods. The bridge contract 
 | POST | /api/actions/execute | Execute action or workflow |
 | POST | /api/actions/preview | Preview workflow actions |
 | GET | /api/transport | Current transport state (play/stop/record position) |
+| GET | /api/tracks/:id/fx/:idx/params | FX parameters for a specific plugin |
+| GET | /api/session-templates | List saved session templates |
+| GET | /api/session-templates/:id | Get a specific template |
+| POST | /api/session-templates | Save current session as template |
+| POST | /api/session-templates/:id/load | Load a session template |
+| DELETE | /api/session-templates/:id | Delete a session template |
 | GET | /api/action-log | Recent action history |
 
 ## WebSocket
 
 Connect to `ws://localhost:3000` for real-time updates:
 
-- `session_update` - periodic session state push
+- `session_update` - session state push (file-change-driven + interval fallback)
 - `initial_state` - sent on connection
 - `transport_update` - transport state changes
 - `action_executed` - sent when actions complete
+- `peak_update` - track peak meter data (250ms poll)
 
 ## MCP Server Compatibility
 
@@ -174,10 +189,15 @@ These actions execute immediately without a workflow preview:
 | muteTrack, soloTrack | Track mute/solo |
 | setTrackVolume, setTrackPan | Volume and pan control |
 | createTrack, renameTrack, duplicateTrack | Track management |
+| createMidiTrack | Create MIDI/instrument track with optional plugin |
 | moveTrackToFolder | Move track into a folder track |
 | insertMarker, createRegion | Markers and regions |
-| undo, redo | Undo/redo history |
+| insertMidiNotes | Write MIDI notes into a track (chords, scales, melodies) |
+| createMidiItem | Create an empty MIDI item on a track |
+| getFxParameters, setFxParameter, setFxPreset | FX parameter control |
 | getTrackFx, removeFx, toggleFxBypass | FX management |
+| getTrackPeaks | Real-time peak meter data |
+| undo, redo | Undo/redo history |
 | renderProject, renderStems | Rendering/export |
 
 ## Keyboard Shortcuts
@@ -205,7 +225,66 @@ With voice control enabled (Web Speech API), you can say:
 - "Pan left" / "Pan right" / "Pan center" / "Pan 50% left"
 - "Set me up to record vocals" / "Punch loop bars 8 to 16"
 - "Preflight check" / "Rough mix" / "Comp takes"
+- "Create a MIDI track" / "Add an instrument track with ReaSynth"
+- "Chord progression with C, Am, F, G" / "Chords using C major and E minor"
+- "Play a C major scale" / "Write A minor pentatonic scale in octave 3"
+- "Write midi notes C4 E4 G4 B4"
+- "Set threshold to -20 on the compressor" / "Show me the parameters"
+- "Save template as My Session" / "Load template Vocal Session" / "List my templates"
 - "Undo" / "Redo"
+
+## MIDI Composition
+
+SessionPilot can write MIDI notes directly into REAPER from natural language. The music theory engine uses [tonal](https://github.com/tonaljs/tonal) to resolve chord names, scales, and note names into MIDI data.
+
+### Chord Progressions
+
+```
+"chord progression with C, Am, F, G"
+"create a chord progression using C major, E minor, and G dominant 7"
+"write chords Dm7, G7, Cmaj7 with half notes"
+"chords using F sharp minor and B flat major in octave 3"
+```
+
+Supports major, minor, 7th, maj7, dim, aug, sus, and more. Natural language names like "C major", "E minor", "G dominant 7", "F sharp minor" are normalized automatically.
+
+### Scale Runs
+
+```
+"play a C major scale"
+"write A minor pentatonic scale in octave 3"
+"create a D dorian scale"
+"E flat blues scale"
+```
+
+Supports major, minor, pentatonic, blues, dorian, mixolydian, lydian, phrygian, locrian, harmonic minor, melodic minor, whole tone, and more.
+
+### Direct Note Entry
+
+```
+"write midi notes C4 E4 G4 B4"
+"insert midi notes D3 F#3 A3"
+```
+
+Notes are written sequentially as quarter notes. If no MIDI track is selected, one is created automatically.
+
+### Options
+
+- **Octave**: "in octave 3" (default: 4)
+- **Duration**: "whole notes", "half notes", "quarter notes", "2 beats each"
+- **Velocity**: "soft" (60), "loud" (120), "velocity 100"
+
+## Session Templates
+
+Save and restore full session configurations (tracks, markers, regions):
+
+```
+"save template as My Vocal Session"
+"list my templates"
+"load template My Vocal Session"
+```
+
+Templates are stored as JSON files in the `templates/` directory.
 
 ## Command Chaining
 
