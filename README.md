@@ -1,39 +1,61 @@
 # SessionPilot for REAPER
 
-AI Recording Engineer Assistant for REAPER DAW. SessionPilot provides a natural language interface for controlling REAPER, with specialized workflows for vocal recording sessions, monitoring diagnostics, and track organization.
+AI Recording Workflow Assistant for REAPER DAW. SessionPilot's core promise is **your session never gets stuck** — it monitors your session health in real time, greets new sessions with a quick brief, guides you through recording workflows in natural language, and remembers your preferences across sessions.
 
 ## Features
 
+### AI Workflow Intelligence
 - Natural language recording assistant (text, voice, and quick-action buttons)
-- Transport controls (play, stop, record, pause, go-to-bar) from chat, voice, keyboard, or UI
-- Keyboard shortcuts for transport (Space, R, Home, End, Esc)
-- Volume and pan control via voice commands, chat, or UI sliders
-- Vocal session setup workflows (lead, doubles, adlibs, full stack)
+- Session intake flow — quick onboarding brief at the start of each session (goal + genre)
+- **"What should I do next?"** session advisor — context-aware suggestions based on current session state
+- Persistent user profile — remembers your preferred track style, punch-in method, genre, and custom notes across sessions
+- Optional Claude LLM fallback for ambiguous or complex messages
+- Context-aware fallback suggestions based on live session state
+
+### Session Health Monitoring
+- **Real-time health warnings** in the sidebar — proactively flags issues on every state update:
+  - Recording with no armed tracks
+  - Armed tracks with input monitoring off
+  - Duplicate inputs on multiple armed tracks
+  - No input assigned to armed track
+  - FX-heavy chains while tracking (latency risk)
+  - No tracks in session
+- Severities: error (red), warning (amber), info (blue)
+
+### Recording Workflows
+- Vocal session setup (lead, doubles, adlibs, full stack)
 - Punch-in and loop-punch preparation with pre-roll
+- Comp takes review and selection
+- Song structure marking (verse/chorus/bridge markers and regions)
+- Batch recording setup (playlist-style multi-song sessions)
+
+### Track & Session Control
+- Transport controls (play, stop, record, pause, go-to-bar) from chat, voice, keyboard, or UI
+- Keyboard shortcuts (Space, R, Home, End, Esc)
+- Volume and pan control via voice commands, chat, or UI sliders
 - FX chain management (insert, remove, bypass, and parameter control per track)
 - FX parameter control with real-time sliders (EQ freq, compressor threshold, etc.)
 - MIDI/instrument track creation with automatic input routing
-- MIDI composition via natural language — chord progressions, scale runs, and note entry
-- Music theory engine powered by [tonal](https://github.com/tonaljs/tonal) (chords, scales, voicings)
 - Session template system — save and restore full session configurations
-- Peak meter visualization (per-track sidebar meters and selected track stereo meter)
-- Track type detection and display (audio, MIDI, instrument, folder)
-- Batch recording setup (playlist-style multi-song sessions)
-- Export/bounce workflows (mix, stems, or both)
+- Track organization with folder management, color-coding, and rough mixing
+- Monitoring and input level diagnostics
 - Marker navigation ("go to chorus", "jump to verse 2")
 - Undo/redo with history log
-- Monitoring and input level diagnostics
-- Track organization with folder management, color-coding, and rough mixing
-- Comp takes review and selection
-- Song structure marking (verse/chorus/bridge markers and regions)
+- Export/bounce workflows (mix, stems, or both)
+
+### MIDI Composition
+- Natural language MIDI composition — chord progressions, scale runs, and direct note entry
+- Music theory engine powered by [tonal](https://github.com/tonaljs/tonal) (chords, scales, voicings)
+
+### UI
+- Peak meter visualization (per-track sidebar meters and selected track stereo meter)
+- Track type detection and display (audio, MIDI, instrument, folder)
 - Action preview and confirmation for destructive operations
 - Transport-aware action gating (blocks destructive ops while recording)
 - Command chaining ("arm track then hit record")
 - Action queue for sequential command execution
 - Voice command help overlay (press ? or click help button)
 - Real-time session state display via WebSocket with file-change-driven updates
-- Optional Claude LLM fallback for ambiguous messages
-- Context-aware fallback suggestions based on session state
 
 ## Quick Start
 
@@ -72,13 +94,13 @@ npm start
 
 - `server/` - Express backend
   - `bridge/` - REAPER bridge abstraction and implementations
-  - `services/` - AI orchestrator, workflow service, music theory, template service, action log
+  - `services/` - AI orchestrator, chat orchestrator, workflow service, music theory, template service, session health check, intake service, user profile, preference parser, action log, session memory
   - `workflows/` - Individual workflow handlers
   - `routes/` - REST API endpoints
   - `models/` - Data model factories
-  - `websocket/` - WebSocket server
+  - `websocket/` - WebSocket server (broadcasts session state + health warnings)
 - `public/` - Frontend
-  - `components/` - UI components
+  - `components/` - UI components (sidebar with health warnings, chat, track panel, etc.)
   - `modules/` - State management, API client, WebSocket client
 - `reaper/` - REAPER Lua bridge script
 
@@ -88,7 +110,7 @@ npm start
 |----------|---------|-------------|
 | `USE_REAL_BRIDGE` | `0` | Set to `1` to use the JSON queue bridge with a real REAPER instance |
 | `REAPER_BRIDGE_DIR` | `./reaper_bridge` | Path to the bridge directory (commands/results/state.json) |
-| `ANTHROPIC_API_KEY` | (none) | Optional. Enables Claude LLM fallback for ambiguous messages |
+| `ANTHROPIC_API_KEY` | (none) | Optional. Enables Claude LLM fallback and AI session advisor |
 | `SESSIONPILOT_PLANNER_MODE` | `heuristic` | `heuristic` (default), `heuristic-only` (no LLM), or `off` |
 | `PORT` | `3000` | Server port |
 
@@ -142,6 +164,7 @@ Connect to `ws://localhost:3000` for real-time updates:
 - `transport_update` - transport state changes
 - `action_executed` - sent when actions complete
 - `peak_update` - track peak meter data (250ms poll)
+- `health_warnings` - session health check results (sent on every state cycle)
 
 ## MCP Server Compatibility
 
@@ -231,7 +254,63 @@ With voice control enabled (Web Speech API), you can say:
 - "Write midi notes C4 E4 G4 B4"
 - "Set threshold to -20 on the compressor" / "Show me the parameters"
 - "Save template as My Session" / "Load template Vocal Session" / "List my templates"
+- "What should I do next?" / "Now what?" / "What's the move?"
+- "I always track dry" / "My genre is hip-hop" / "Remember that I punch in by region"
 - "Undo" / "Redo"
+
+## Session Health Monitoring
+
+SessionPilot analyzes your session on every state update and surfaces warnings in the sidebar before they derail your workflow:
+
+| Warning | Severity | Condition |
+|---------|----------|-----------|
+| Recording but no tracks armed | Error | Transport rolling, no armed tracks |
+| Monitoring off on armed track | Warning | Armed track has input monitoring disabled |
+| Same input on multiple armed tracks | Warning | Two armed tracks share an input — double-recording |
+| No input assigned on armed track | Info | Armed track has no input source set |
+| FX-heavy chain on armed track | Warning | 4+ plugins on a tracking chain (latency risk) |
+| Session has no tracks | Info | Empty session |
+
+Warnings appear color-coded in the left sidebar and clear automatically when resolved.
+
+## Session Intake
+
+At the start of each new session, SessionPilot asks two quick questions to brief itself on what you're working on:
+
+1. **What are we working on today?** — goal (new song, overdubs, a hook, etc.)
+2. **What's the genre or vibe?** — helps the advisor give relevant suggestions
+
+Say `skip` to bypass any question. If your first message is already a command (e.g. "arm the vocal track"), intake is skipped automatically and you go straight to work.
+
+Intake answers feed into the LLM context so advice and suggestions are tailored to your session from the first message.
+
+## Session Advisor
+
+Ask "what should I do next?" (or "now what?", "what's the move?") at any point and SessionPilot gives one concrete, context-aware suggestion:
+
+- Recording in progress → encourages you to stay focused
+- Tracks armed but not rolling → confirms you're ready and suggests preflight or record
+- Takes exist but nothing armed → suggests comping or punching in
+- Fresh session → recommends setting up a first track
+- No song sections marked → suggests running `markSongStructure`
+
+When `ANTHROPIC_API_KEY` is set, the advisor uses Claude for richer, session-specific guidance. Otherwise a fast heuristic path runs locally.
+
+## User Profile & Preferences
+
+SessionPilot remembers your working preferences across sessions in `user_profile.json`:
+
+| Preference | Example phrase |
+|------------|----------------|
+| Track style | "I always track dry" / "I prefer tracking wet" |
+| Punch-in method | "I punch in by region" / "punch-ins by track" |
+| Hook workflow | "My hook workflow is comp then tune" |
+| Naming convention | "My naming convention is Artist_Title_Take" |
+| Preferred octave | "preferred octave 3" |
+| Genre | "I make hip-hop" / "my genre is R&B" |
+| Freeform notes | "Remember that I always use a click with reverb" |
+
+Preferences are included in the LLM context so suggestions and plans reflect your workflow automatically.
 
 ## MIDI Composition
 
