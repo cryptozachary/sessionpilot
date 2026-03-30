@@ -1,4 +1,5 @@
 const actionLog = require('./actionLog');
+const userProfile = require('./userProfile');
 
 function resolveSettledData(result, fallbackValue) {
   if (result.status !== 'fulfilled' || !result.value || result.value.ok === false) {
@@ -200,6 +201,7 @@ async function buildSessionContext(bridge, options = {}) {
   };
 
   context.sections = buildSections(markers, regions, context);
+  context.userProfile = await userProfile.load();
 
   return context;
 }

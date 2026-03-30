@@ -86,8 +86,20 @@ class SessionMemoryStore {
       lastIntent: session.lastIntent || null,
       lastPlan: session.lastPlan ? cloneValue(session.lastPlan) : null,
       lastTrack: session.lastTrack ? { ...session.lastTrack } : null,
-      lastSection: session.lastSection ? cloneValue(session.lastSection) : null
+      lastSection: session.lastSection ? cloneValue(session.lastSection) : null,
+      intake: session.intake ? cloneValue(session.intake) : null
     };
+  }
+
+  getIntake(sessionId) {
+    const session = this._ensureSession(sessionId);
+    return session.intake ? cloneValue(session.intake) : null;
+  }
+
+  updateIntake(sessionId, intakeState) {
+    const session = this._ensureSession(sessionId);
+    session.intake = cloneValue(intakeState);
+    session.updatedAt = new Date().toISOString();
   }
 
   rememberTurn(sessionId, payload = {}) {
@@ -135,6 +147,7 @@ class SessionMemoryStore {
         lastPlan: null,
         lastTrack: null,
         lastSection: null,
+        intake: null,
         updatedAt: new Date().toISOString()
       });
     }

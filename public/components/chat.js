@@ -31,8 +31,9 @@ window.SessionPilot.Chat = (() => {
 
   function renderMessage(msg) {
     const cls = msg.role === 'user' ? 'user' : 'assistant';
+    const routeCls = msg.route ? ` message-route-${msg.route}` : '';
     const content = formatText(msg.content || '');
-    return `<div class="message ${cls}"><div class="message-content">${content}</div></div>`;
+    return `<div class="message ${cls}${routeCls}"><div class="message-content">${content}</div></div>`;
   }
 
   /**
@@ -103,9 +104,11 @@ window.SessionPilot.Chat = (() => {
       if (response.ok !== false) {
         const assistantMsg = response.message || (response.data && response.data.message) || 'Done.';
         const proposedActions = response.proposedActions || (response.data && response.data.proposedActions) || [];
+        const responseRoute = (response.context && response.context.route) || null;
 
         State().addChatMessage('assistant', assistantMsg, {
-          actions: proposedActions
+          actions: proposedActions,
+          route: responseRoute
         });
 
         if (proposedActions.length > 0) {

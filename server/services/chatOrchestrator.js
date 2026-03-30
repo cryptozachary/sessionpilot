@@ -7,6 +7,7 @@ const workflowService = require('./workflowService');
 const sessionMemory = require('./sessionMemory');
 const { buildSessionContext } = require('./contextBuilder');
 const planner = require('./llmPlanner');
+const intakeService = require('./intakeService');
 
 function shouldAugmentWithPlanner(matchedIntent, extractedArgs) {
   if (!matchedIntent) {
@@ -17,7 +18,49 @@ function shouldAugmentWithPlanner(matchedIntent, extractedArgs) {
     return !Number.isFinite(extractedArgs.startBar) || !Number.isFinite(extractedArgs.endBar);
   }
 
+  if (matchedIntent.intent === 'session_advisor') {
+    return true;
+  }
+
   return false;
+}
+
+function buildHeuristicAdvisorResponse(contextSnapshot) {
+  const tracks = (contextSnapshot && contextSnapshot.tracks) || [];
+  const transport = (contextSnapshot && contextSnapshot.transport) || { state: 'stopped' };
+  const recording = (contextSnapshot && contextSnapshot.recording) || {
+    armedTracks: [],
+    armedTrackCount: 0,
+    totalTakeCount: 0
+  };
+
+  let parts = [];
+
+  if (transport.state === 'recording') {
+    parts.push("You're rolling — stay focused on the performance. Stop when you've got the take.");
+  } else if (recording.armedTrackCount > 0) {
+    const armed = recording.armedTrackCount;
+    parts.push(`${armed} track${armed > 1 ? 's' : ''} armed and ready. Say "run a preflight check" before you record, or hit record when you're set.`);
+  } else if (recording.totalTakeCount > 0) {
+    parts.push("You have takes recorded. Try \"comp the takes\" to pick the best parts, or \"punch in\" to redo a section.");
+  } else if (tracks.length === 0) {
+    parts.push('Session is empty. Say "set up a vocal track" or "create a track called [name]" to get started.');
+  } else {
+    parts.push(`You have ${tracks.length} track${tracks.length > 1 ? 's' : ''}. Arm one for recording, or say "set up a lead vocal" to get rolling.`);
+  }
+
+  const sections = (contextSnapshot && contextSnapshot.sections) || [];
+  if (tracks.length > 0 && sections.length === 0 && transport.state === 'stopped') {
+    parts.push('No song sections marked yet — say "mark song structure" and tell me where your verse, chorus, and bridge are.');
+  }
+
+  return createAssistantResponse({
+    message: parts.join(' '),
+    proposedActions: [],
+    requiresConfirmation: false,
+    actionType: 'advice',
+    context: { route: 'advisor_heuristic', intent: 'session_advisor' }
+  });
 }
 
 function buildFallbackResponse() {
@@ -201,24 +244,60 @@ module.exports = {
     const matchedIntent = aiOrchestrator.classifyIntent(message);
     const extractedArgs = matchedIntent ? aiOrchestrator.extractArgs(message, matchedIntent.intent) : {};
 
+    // ── Session Intake Intercept ──────────────────────────────────────────────
+    // On the first message of a new session, greet the user and ask 2 quick
+    // onboarding questions (goal + genre). If the user's first message is already
+    // a clear command, skip intake silently and mark it complete.
+    const currentIntake = memorySnapshot.intake;
+    if (!intakeService.isComplete(currentIntake)) {
+      const isCommand = Boolean(matchedIntent && matchedIntent.intent !== 'session_advisor');
+      const intakeResult = intakeService.handleIntakeMessage(message, currentIntake, isCommand);
+      sessionMemory.updateIntake(sessionId, intakeResult.newIntakeState);
+
+      if (intakeResult.message !== null) {
+        const intakeResponse = createAssistantResponse({
+          message: intakeResult.message,
+          proposedActions: [],
+          requiresConfirmation: false,
+          actionType: 'advice',
+          context: { route: 'intake', intent: 'intake', sessionId }
+        });
+        sessionMemory.rememberTurn(sessionId, { message, response: intakeResponse, contextSnapshot });
+        return intakeResponse;
+      }
+      // message === null → bypass intake, fall through to normal processing
+    }
+
+    // ── Normal processing ─────────────────────────────────────────────────────
     let response;
     let plannerResponse = null;
 
     if (shouldAugmentWithPlanner(matchedIntent, extractedArgs)) {
-      const plan = await planner.plan({
-        message,
-        context: contextSnapshot,
-        memory: memorySnapshot
-      });
-      plannerResponse = await buildPlannerResponse(bridge, plan);
+      // session_advisor: try LLM advisor, fall back to heuristic
+      if (matchedIntent && matchedIntent.intent === 'session_advisor') {
+        const advisorPlan = await planner.planAdvisor({ message, context: contextSnapshot });
+        if (advisorPlan) {
+          plannerResponse = await buildPlannerResponse(bridge, advisorPlan);
+        }
+        response = plannerResponse || buildHeuristicAdvisorResponse(contextSnapshot);
+      } else {
+        const plan = await planner.plan({
+          message,
+          context: contextSnapshot,
+          memory: memorySnapshot
+        });
+        plannerResponse = await buildPlannerResponse(bridge, plan);
+      }
     }
 
-    if (plannerResponse && plannerResponse.context && plannerResponse.context.route === 'planner') {
-      response = plannerResponse;
-    } else if (matchedIntent) {
-      response = await aiOrchestrator.processMessage(bridge, message, { matchedIntent });
-    } else {
-      response = plannerResponse || buildContextAwareFallback(contextSnapshot);
+    if (!response) {
+      if (plannerResponse && plannerResponse.context && plannerResponse.context.route === 'planner') {
+        response = plannerResponse;
+      } else if (matchedIntent) {
+        response = await aiOrchestrator.processMessage(bridge, message, { matchedIntent });
+      } else {
+        response = plannerResponse || buildContextAwareFallback(contextSnapshot);
+      }
     }
 
     response.context = {

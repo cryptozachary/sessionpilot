@@ -3,6 +3,7 @@
 
 const WebSocket = require('ws');
 const fs = require('fs');
+const healthCheck = require('../services/sessionHealthCheck');
 
 module.exports = function setupWebSocket(server, bridge) {
   const wss = new WebSocket.Server({ server });
@@ -53,16 +54,33 @@ module.exports = function setupWebSocket(server, bridge) {
   async function broadcastSessionState() {
     if (wss.clients.size === 0) return;
     try {
-      const [session, tracks, selected] = await Promise.all([
+      const [session, tracks, selected, transport] = await Promise.all([
         bridge.getProjectSummary(),
         bridge.listTracks(),
-        bridge.getSelectedTrack()
+        bridge.getSelectedTrack(),
+        bridge.getTransportState()
       ]);
+      const tracksData = (tracks.data || []);
+      const transportData = transport.data || { state: 'stopped' };
+      const armedTracks = tracksData.filter(t => t.isArmed || t.armed);
+
       broadcast('session_update', {
         session: session.data,
-        tracks: tracks.data,
+        tracks: tracksData,
         selectedTrack: selected.data
       });
+
+      // Run health check and broadcast warnings every cycle
+      const snapshot = {
+        tracks: tracksData,
+        transport: transportData,
+        recording: {
+          armedTracks: armedTracks.map(t => ({ id: t.id, name: t.name })),
+          armedTrackCount: armedTracks.length
+        }
+      };
+      const { warnings } = healthCheck.analyzeSession(snapshot);
+      broadcast('health_warnings', { warnings });
     } catch (e) {
       broadcast('error', { message: 'Failed to poll session state' });
     }

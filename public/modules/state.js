@@ -49,7 +49,8 @@ window.SessionPilot.State = (() => {
     chatMessages: Array.isArray(persisted.chatMessages) ? persisted.chatMessages : [],
     actionLog: Array.isArray(persisted.actionLog) ? persisted.actionLog : [],
     pendingActions: [],
-    workflows: []
+    workflows: [],
+    healthWarnings: []
   };
 
   const listeners = {};

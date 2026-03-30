@@ -1,4 +1,5 @@
 const { PLAN_KINDS, validatePlan } = require('./plannerSchema');
+const userProfileService = require('./userProfile');
 
 // LLM integration (optional — requires ANTHROPIC_API_KEY env var and @anthropic-ai/sdk)
 let Anthropic = null;
@@ -293,7 +294,8 @@ async function planWithLLM(message, context) {
     .join(', ');
   const session = context.session || {};
 
-  const contextLine = `Session: "${session.projectName || 'Untitled'}" | ${(context.tracks || []).length} tracks [${tracks}] | Selected: ${selectedTrack} | Sections: ${sections || 'none'} | BPM: ${session.bpm || '?'}`;
+  const profileSummary = userProfileService.summarize(context.userProfile);
+  const contextLine = `Session: "${session.projectName || 'Untitled'}" | ${(context.tracks || []).length} tracks [${tracks}] | Selected: ${selectedTrack} | Sections: ${sections || 'none'} | BPM: ${session.bpm || '?'}${profileSummary ? ` | Preferences: ${profileSummary}` : ''}`;
 
   try {
     const client = new Anthropic({ apiKey });
@@ -343,6 +345,72 @@ async function plan({ message, context, memory }) {
   return null;
 }
 
+const ADVISOR_SYSTEM_PROMPT = `You are a REAPER DAW session advisor. The user asked for session guidance ("what should I do next?", "now what?", etc.). Analyze their current session state and give ONE concrete, actionable suggestion tailored to where they are in the session.
+
+Guidelines:
+- If recording: encourage them to keep going or stop to review
+- If armed but not recording: tell them they are set up and ready
+- If takes exist but nothing armed: suggest comping or punching in
+- If session is empty: suggest setting up a first track
+- Keep it conversational and specific — mention track names or section names when available
+- Max 2 sentences. Do not list multiple options.
+
+Respond with ONLY valid JSON: {"kind":"advice","message":"your advice here","confidence":0.85}`;
+
+async function planAdvisor({ message, context }) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || !Anthropic) {
+    return null;
+  }
+
+  const mode = (process.env.SESSIONPILOT_PLANNER_MODE || 'heuristic').toLowerCase();
+  if (mode === 'off' || mode === 'heuristic-only') {
+    return null;
+  }
+
+  const tracks = (context.tracks || []).map(t => t.name).join(', ');
+  const selectedTrack = context.selectedTrack ? context.selectedTrack.name : 'none';
+  const sections = (context.sections || [])
+    .map(s => `${s.name} (bars ${s.startBar}-${s.endBar})`)
+    .join(', ');
+  const session = context.session || {};
+  const transport = context.transport || { state: 'stopped' };
+  const recording = context.recording || { armedTrackCount: 0, totalTakeCount: 0 };
+  const profileSummary = userProfileService.summarize(context.userProfile);
+
+  const contextLine = [
+    `Session: "${session.projectName || 'Untitled'}"`,
+    `Tracks: [${tracks || 'none'}]`,
+    `Selected: ${selectedTrack}`,
+    `Transport: ${transport.state}`,
+    `Armed: ${recording.armedTrackCount}`,
+    `Takes: ${recording.totalTakeCount}`,
+    sections ? `Sections: ${sections}` : null,
+    profileSummary ? `Preferences: ${profileSummary}` : null
+  ].filter(Boolean).join(' | ');
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 200,
+      system: ADVISOR_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: `${contextLine}\n\nUser: ${message}` }]
+    });
+
+    const text = (response.content[0].text || '').trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return finalizePlan({ ...parsed, kind: 'advice' });
+  } catch (err) {
+    console.error('LLM advisor error:', err.message);
+    return null;
+  }
+}
+
 module.exports = {
-  plan
+  plan,
+  planAdvisor
 };

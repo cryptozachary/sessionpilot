@@ -222,10 +222,37 @@ const INTENT_PATTERNS = [
     intent: 'session_info', actionType: 'advice'
   },
 
+  // Preferences / memory
+  {
+    patterns: [
+      /\bremember\s+that\b/i,
+      /\balways\s+(?:track|use|prefer|do|record|start|keep)\b/i,
+      /\bmy\s+(?:hook|chorus|punch[- ]in|naming|track)\s+(?:workflow|style|convention|format)\s+is\b/i,
+      /\bi\s+(?:prefer|like\s+to)\s+track\s+(?:dry|wet)\b/i,
+      /\bpunch[- ]in(?:s)?\s+by\s+(?:region|track)\b/i,
+      /\bsave\s+(?:this\s+)?preference\b/i
+    ],
+    intent: 'remember_preference', actionType: 'advice'
+  },
+
   // Greeting / help
   {
     patterns: [/^(hey|hi|hello|sup|yo)/i, /what\s*can\s*you\s*do/i, /help\s*me/i],
     intent: 'greeting', actionType: 'advice'
+  },
+
+  // Session advisor — "what should I do next?"
+  {
+    patterns: [
+      /\bwhat\s+(?:should|can)\s+(?:i|we)\s+do\s+(?:now|next|from\s+here)?\b/i,
+      /\bwhat(?:'s|\s+is)\s+(?:next|the\s+(?:next\s+)?move|the\s+plan)\b/i,
+      /\bnow\s+what\b/i,
+      /\bwhat\s+do\s+(?:i|we)\s+do\s+(?:now|next|from\s+here)\b/i,
+      /\badvise\s+me\b/i,
+      /\bwhat\s+do\s+you\s+recommend\b/i,
+      /\bwhere\s+do\s+(?:i|we)\s+(?:go|start)\s+from\s+here\b/i
+    ],
+    intent: 'session_advisor', actionType: 'advice'
   }
 ];
 
@@ -942,6 +969,46 @@ async function handleDirectAction(bridge, matched, message) {
         'advice',
         baseContext
       );
+    }
+
+    case 'remember_preference': {
+      const { parsePreference } = require('./preferenceParser');
+      const userProfile = require('./userProfile');
+      const update = parsePreference(message);
+      if (!update) {
+        return buildResponse(
+          "I didn't catch that clearly. Try something like: \"remember that I always track dry\", \"my punch-in style is by region\", or \"my hook workflow is lead then doubles then adlibs\".",
+          [], 'advice', baseContext
+        );
+      }
+      try {
+        if (update.field === 'notes') {
+          await userProfile.addNote(update.value);
+          return buildResponse(
+            `Got it — I'll remember: "${update.value}". I'll factor this into future session suggestions.`,
+            [], 'advice', { ...baseContext, profileUpdated: true }
+          );
+        }
+        await userProfile.updateField(update.field, update.value);
+        const labels = {
+          preferredTrackStyle: 'track style',
+          punchInStyle: 'punch-in style',
+          hookWorkflow: 'hook workflow',
+          namingConventions: 'naming convention',
+          preferredOctave: 'preferred octave',
+          genre: 'genre'
+        };
+        const label = labels[update.field] || update.field;
+        return buildResponse(
+          `Got it — I'll remember your ${label}: "${update.value}". This will inform all future session suggestions.`,
+          [], 'advice', { ...baseContext, profileUpdated: true }
+        );
+      } catch (e) {
+        return buildResponse(
+          `Couldn't save that preference: ${e.message}`,
+          [], 'advice', baseContext
+        );
+      }
     }
 
     case 'create_chord_progression': {

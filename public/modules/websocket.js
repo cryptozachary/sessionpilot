@@ -129,6 +129,10 @@ window.SessionPilot.WS = (() => {
         State().emit('peakUpdate', msg.data);
         break;
 
+      case 'health_warnings':
+        State().set('healthWarnings', Array.isArray(msg.data && msg.data.warnings) ? msg.data.warnings : []);
+        break;
+
       case 'action_executed':
         // Clear progress and add to action log
         State().set('workflowProgress', null);

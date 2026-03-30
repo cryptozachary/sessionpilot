@@ -102,6 +102,23 @@ window.SessionPilot.Sidebar = (() => {
     });
   }
 
+  function renderHealthWarnings(warnings) {
+    const container = document.getElementById('health-warnings-bar');
+    if (!container) return;
+
+    if (!warnings || warnings.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = warnings.map(w => `
+      <div class="health-warning health-warning--${w.severity}" title="${escapeHtml(w.detail || '')}">
+        <span class="health-warning-icon">${w.severity === 'error' ? '!' : w.severity === 'warning' ? '⚠' : 'i'}</span>
+        <span class="health-warning-text">${escapeHtml(w.message)}</span>
+      </div>
+    `).join('');
+  }
+
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -128,10 +145,12 @@ window.SessionPilot.Sidebar = (() => {
       renderTrackList(State().get('tracks'));
     });
     State().on('peakUpdate', updatePeakMeters);
+    State().on('healthWarnings', renderHealthWarnings);
 
     // Render initial state
     renderSessionSummary(State().get('session'));
     renderTrackList(State().get('tracks'));
+    renderHealthWarnings(State().get('healthWarnings'));
   }
 
   return { init };
