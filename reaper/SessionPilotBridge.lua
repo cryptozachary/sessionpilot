@@ -1645,6 +1645,25 @@ local function trackIndex(tr)
   return math.floor(reaper.GetMediaTrackInfo_Value(tr, "IP_TRACKNUMBER") - 1)
 end
 
+-- Move `track` so it sits immediately after `anchor`, regardless of starting
+-- position. ReorderSelectedTracks' target index behaves differently for up vs
+-- down moves (and shifts as the track is removed), so converge by re-reading
+-- the actual result and correcting, rather than predicting the offset.
+local function moveTrackAfter(track, anchor)
+  for _ = 1, 5 do
+    local aIdx = trackIndex(anchor)
+    local tIdx = trackIndex(track)
+    if tIdx == aIdx + 1 then return true end
+    reaper.SetOnlyTrackSelected(track)
+    if tIdx > aIdx then
+      reaper.ReorderSelectedTracks(aIdx + 1, 0) -- moving up: lands just after anchor
+    else
+      reaper.ReorderSelectedTracks(aIdx + 2, 0) -- moving down: removal shifts anchor up one
+    end
+  end
+  return trackIndex(track) == trackIndex(anchor) + 1
+end
+
 commands.moveTrackToFolder = function(args)
   local track = findTrackById(args.trackId)
   local folder = findTrackById(args.folderId)
@@ -1657,7 +1676,6 @@ commands.moveTrackToFolder = function(args)
 
   local total = reaper.CountTracks(0)
   local fIdx = trackIndex(folder)
-  reaper.SetMediaTrackInfo_Value(folder, "I_FOLDERDEPTH", 1)
 
   -- Find the folder's current closer (the child whose running depth, starting at
   -- +1 for the parent, returns to <= 0). The track being moved is ignored so a
@@ -1674,21 +1692,16 @@ commands.moveTrackToFolder = function(args)
     end
   end
 
-  -- Reorder: place the moved track immediately after the folder's last member
-  -- (the closer), or immediately after the parent when the folder is empty.
-  local anchorIdx = closer and trackIndex(closer) or fIdx
-  reaper.SetOnlyTrackSelected(track)
-  reaper.ReorderSelectedTracks(anchorIdx + 1, 0)
+  -- Place the moved track immediately after the folder's last member (the
+  -- closer), or immediately after the parent when the folder is empty/open.
+  local anchor = closer or folder
+  moveTrackAfter(track, anchor)
 
-  -- ReorderSelectedTracks places the selection *above* the given index using the
-  -- pre-move numbering; when the track started above the anchor it lands one slot
-  -- short. Detect that from the actual result and nudge it down once.
-  if closer and trackIndex(track) ~= trackIndex(closer) + 1 then
-    reaper.ReorderSelectedTracks(trackIndex(closer) + 2, 0)
-  end
-
-  -- Repair depths from the real resulting order: old closer becomes a normal
-  -- child (0), the moved track becomes the new closer (-1).
+  -- Set depths only AFTER all reordering is done, so REAPER never normalizes an
+  -- inconsistent intermediate (an open folder mid-reorder gets reset to 0).
+  -- Parent opens the folder (1), old closer becomes a normal child (0), and the
+  -- moved track becomes the new last child / closer (-1).
+  reaper.SetMediaTrackInfo_Value(folder, "I_FOLDERDEPTH", 1)
   if closer and closer ~= track then
     reaper.SetMediaTrackInfo_Value(closer, "I_FOLDERDEPTH", 0)
   end
