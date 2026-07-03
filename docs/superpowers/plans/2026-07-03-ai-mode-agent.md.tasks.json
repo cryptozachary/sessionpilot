@@ -4,55 +4,55 @@
     {
       "id": 0,
       "subject": "Task 0: Test harness + assistantMode profile setting",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add persisted assistantMode ('default'|'ai') to the user profile + GET/POST route, and wire up node:test.\n\n**Files:** package.json, server/services/userProfile.js, server/routes/session.js, test/userProfile.test.js\n\n**Verify:** node --test test/userProfile.test.js\n\n```json:metadata\n{\"files\": [\"package.json\", \"server/services/userProfile.js\", \"server/routes/session.js\", \"test/userProfile.test.js\"], \"verifyCommand\": \"node --test test/userProfile.test.js\", \"acceptanceCriteria\": [\"fresh profile defaults assistantMode to default\", \"updateField persists ai\", \"invalid value rejected\", \"GET/POST /api/assistant-mode work\"]}\n```"
     },
     {
       "id": 1,
       "subject": "Task 1: Tool registry (actions + workflows + read tools) with parity guard",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [0],
       "description": "**Goal:** buildTools() -> {tools, byName}; read tools have execute(), write tools have toAction(); parity test fails if any DIRECT_ACTION_MAP action or workflow lacks a tool; last tool has cache_control.\n\n**Files:** server/services/toolRegistry.js, server/routes/actions.js, test/toolRegistry.test.js\n\n**Verify:** node --test test/toolRegistry.test.js\n\n```json:metadata\n{\"files\": [\"server/services/toolRegistry.js\", \"server/routes/actions.js\", \"test/toolRegistry.test.js\"], \"verifyCommand\": \"node --test test/toolRegistry.test.js\", \"acceptanceCriteria\": [\"tools array with schemas\", \"read=execute write=toAction\", \"parity with DIRECT_ACTION_MAP+workflows\", \"cache_control on last tool\"]}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: Agent context builder",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [0],
       "description": "**Goal:** buildAgentContext(bridge) -> compact string of per-track state, transport, sections, health warnings.\n\n**Files:** server/services/agentContext.js, test/agentContext.test.js\n\n**Verify:** node --test test/agentContext.test.js\n\n```json:metadata\n{\"files\": [\"server/services/agentContext.js\", \"test/agentContext.test.js\"], \"verifyCommand\": \"node --test test/agentContext.test.js\", \"acceptanceCriteria\": [\"returns string\", \"includes track names + armed/fx/takes\", \"includes health warnings\", \"works on MockReaperBridge\"]}\n```"
     },
     {
       "id": 3,
       "subject": "Task 3: Agent planner core (tool-use loop)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1, 2],
       "description": "**Goal:** runAgent({client,bridge,message}) runs the Anthropic tool-use loop: reads execute live, writes recorded as proposedActions; returns {message, proposedActions, requiresConfirmation}; null without key/SDK. Sonnet 5 + prompt caching. Client injected for tests (fake, no network).\n\n**Files:** server/services/agentPlanner.js, test/agentPlanner.test.js\n\n**Verify:** node --test test/agentPlanner.test.js\n\n```json:metadata\n{\"files\": [\"server/services/agentPlanner.js\", \"test/agentPlanner.test.js\"], \"verifyCommand\": \"node --test test/agentPlanner.test.js\", \"acceptanceCriteria\": [\"reads execute + feed tool_result\", \"writes recorded not executed\", \"loop stops on no tool calls / MAX_TURNS\", \"null without client\"]}\n```"
     },
     {
       "id": 4,
       "subject": "Task 4: Wire agent into chatOrchestrator (mode branch + fast-path)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [3],
       "description": "**Goal:** AI mode routes non-trivial messages to runAgent; trivial FAST_PATH_INTENTS stay deterministic; __workflow__ actions expanded to real previews; default mode unchanged.\n\n**Files:** server/services/chatOrchestrator.js, test/chatOrchestrator.agent.test.js\n\n**Verify:** node --test test/chatOrchestrator.agent.test.js\n\n```json:metadata\n{\"files\": [\"server/services/chatOrchestrator.js\", \"test/chatOrchestrator.agent.test.js\"], \"verifyCommand\": \"node --test test/chatOrchestrator.agent.test.js\", \"acceptanceCriteria\": [\"default mode unchanged\", \"AI mode trivial command deterministic\", \"AI mode non-trivial -> agent\", \"__workflow__ expanded\"]}\n```"
     },
     {
       "id": 5,
       "subject": "Task 5: Frontend mode toggle",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [0],
       "description": "**Goal:** UI toggle (styled like voice toggle) reflecting/persisting assistantMode via /api/assistant-mode.\n\n**Files:** public/index.html, public/components/modeToggle.js, public/app.js, public/styles.css\n\n**Verify:** Manual (Task 7 smoke): load app, click toggle, confirm POST + label change.\n\n```json:metadata\n{\"files\": [\"public/index.html\", \"public/components/modeToggle.js\", \"public/app.js\", \"public/styles.css\"], \"verifyCommand\": \"manual\", \"acceptanceCriteria\": [\"shows current mode on load\", \"click flips + POSTs\", \"label Default vs AI Engineer\"]}\n```"
     },
     {
       "id": 6,
       "subject": "Task 6: Frontend multi-step plan preview/confirm",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [4],
       "description": "**Goal:** Render N proposed actions as a numbered plan with one Confirm; execute in order via /api/actions/execute; single-action behavior unchanged.\n\n**Files:** public/components/actionCards.js, public/components/chat.js, public/modules/actionQueue.js\n\n**Verify:** Manual (Task 7 smoke): multi-step request runs top-to-bottom on confirm.\n\n```json:metadata\n{\"files\": [\"public/components/actionCards.js\", \"public/components/chat.js\", \"public/modules/actionQueue.js\"], \"verifyCommand\": \"manual\", \"acceptanceCriteria\": [\"N steps + one Confirm\", \"executes in order\", \"single action unchanged\"]}\n```"
     },
     {
       "id": 7,
       "subject": "Task 7: Docs, env, end-to-end smoke",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [5, 6],
       "description": "**Goal:** Document Default vs AI mode + env; full suite green; live smoke of multi-step plan, read-only Q&A, and instant fast-path stop.\n\n**Files:** README.md, .env.example\n\n**Verify:** npm test green; manual live smoke.\n\n```json:metadata\n{\"files\": [\"README.md\", \".env.example\"], \"verifyCommand\": \"npm test\", \"acceptanceCriteria\": [\"npm test green\", \"README explains modes + safety + cost\", \"live smoke: multi-step plan executes, Q&A no writes, stop instant\"]}\n```"
     }
