@@ -85,5 +85,55 @@ window.SessionPilot.ActionQueue = (() => {
     queue.length = 0;
   }
 
-  return { enqueue, isProcessing, pending, clear };
+  /**
+   * Execute an ordered plan of actions sequentially, one at a time, awaiting
+   * each /api/actions/execute call before starting the next. Used for
+   * multi-step agent plans that must be confirmed and run as a single unit
+   * (as opposed to enqueue/processNext, which is a separate FIFO queue).
+   *
+   * @param {Object[]} actions - Ordered actions with { type|actionType, args, label }
+   * @param {Object} [options]
+   * @param {boolean} [options.abortOnFail=true] - Stop the plan on first failure
+   * @returns {Promise<{ok: boolean, results: Array, failedAt?: number, error?: string}>}
+   */
+  async function executePlan(actions, options = {}) {
+    const abortOnFail = options.abortOnFail !== false;
+    const items = Array.isArray(actions) ? actions : [actions];
+    const results = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const action = items[i] || {};
+      const actionType = action.actionType || action.type;
+      const args = action.args ||
+        (window.SessionPilot.PendingActions ? window.SessionPilot.PendingActions.extractActionArgs(action) : {});
+      const stepLabel = action.label || actionType || `Step ${i + 1}`;
+
+      try {
+        const result = await API().executeAction({ actionType, args, confirmed: true });
+        results.push(result);
+
+        State().addActionLogEntry({
+          label: stepLabel,
+          status: result.ok !== false ? 'success' : 'failure',
+          type: 'execution'
+        });
+
+        if (result.ok === false && abortOnFail) {
+          return { ok: false, results, failedAt: i, error: result.error || 'Step failed' };
+        }
+      } catch (e) {
+        console.error('ActionQueue.executePlan step failed:', e);
+        State().addActionLogEntry({
+          label: stepLabel,
+          status: 'failure',
+          type: 'execution'
+        });
+        return { ok: false, results, failedAt: i, error: e.message };
+      }
+    }
+
+    return { ok: true, results };
+  }
+
+  return { enqueue, isProcessing, pending, clear, executePlan };
 })();
