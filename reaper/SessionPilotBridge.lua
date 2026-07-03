@@ -1635,23 +1635,64 @@ commands.goToMarker = function(args)
   return { ok = false, data = nil, errors = {"No marker or region found matching \"" .. (args.name or "") .. "\""} }
 end
 
+-- Index (0-based) of a track by identity.
+local function trackIndex(tr)
+  return math.floor(reaper.GetMediaTrackInfo_Value(tr, "IP_TRACKNUMBER") - 1)
+end
+
 commands.moveTrackToFolder = function(args)
-  -- NOTE: robust folder nesting is a design-level change, not a drop-in here.
-  -- REAPER folders are defined by track ORDER + I_FOLDERDEPTH (parent=1,
-  -- children=0, last child=-1). This app's createFolderTrack can make "empty"
-  -- folders (depth 1 with no -1 closer), which REAPER treats as open — they
-  -- absorb every following track — and folders are inserted at the top while
-  -- new tracks append at the bottom. A correct move therefore requires
-  -- redesigning createFolderTrack (never leave a folder open) together with a
-  -- reorder+depth-repair pass. Until then this acknowledges the request rather
-  -- than performing unsafe reordering.
-  local trackId = args.trackId
-  local folderId = args.folderId
-  return {
-    ok = true,
-    data = { trackId = trackId, folderId = folderId, note = "Track folder assignment noted. Manual track reordering may be needed in REAPER." },
-    warnings = {"REAPER track folder management via scripting has limitations. Verify track order in REAPER."}
-  }
+  local track = findTrackById(args.trackId)
+  local folder = findTrackById(args.folderId)
+  if not track or not folder then
+    return { ok = false, errors = {"Track or folder not found"} }
+  end
+  if track == folder then
+    return { ok = false, errors = {"Cannot move a folder into itself"} }
+  end
+
+  local total = reaper.CountTracks(0)
+  local fIdx = trackIndex(folder)
+  reaper.SetMediaTrackInfo_Value(folder, "I_FOLDERDEPTH", 1)
+
+  -- Find the folder's current closer (the child whose running depth, starting at
+  -- +1 for the parent, returns to <= 0). The track being moved is ignored so a
+  -- track already inside doesn't skew the walk. If no closer is found the folder
+  -- is empty/open: the moved track will become its sole, closing child (which
+  -- also de-absorbs any tracks the open folder was accidentally swallowing).
+  local closer = nil
+  local depth = 1
+  for i = fIdx + 1, total - 1 do
+    local t = reaper.GetTrack(0, i)
+    if t ~= track then
+      depth = depth + reaper.GetMediaTrackInfo_Value(t, "I_FOLDERDEPTH")
+      if depth <= 0 then closer = t break end
+    end
+  end
+
+  -- Reorder: place the moved track immediately after the folder's last member
+  -- (the closer), or immediately after the parent when the folder is empty.
+  local anchorIdx = closer and trackIndex(closer) or fIdx
+  reaper.SetOnlyTrackSelected(track)
+  reaper.ReorderSelectedTracks(anchorIdx + 1, 0)
+
+  -- ReorderSelectedTracks places the selection *above* the given index using the
+  -- pre-move numbering; when the track started above the anchor it lands one slot
+  -- short. Detect that from the actual result and nudge it down once.
+  if closer and trackIndex(track) ~= trackIndex(closer) + 1 then
+    reaper.ReorderSelectedTracks(trackIndex(closer) + 2, 0)
+  end
+
+  -- Repair depths from the real resulting order: old closer becomes a normal
+  -- child (0), the moved track becomes the new closer (-1).
+  if closer and closer ~= track then
+    reaper.SetMediaTrackInfo_Value(closer, "I_FOLDERDEPTH", 0)
+  end
+  reaper.SetMediaTrackInfo_Value(track, "I_FOLDERDEPTH", -1)
+
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+
+  return { ok = true, data = getTrackSummary(track, trackIndex(track)) }
 end
 
 ---------------------------------------------------------------------------
