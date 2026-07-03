@@ -593,6 +593,8 @@ commands.createTrack = function(args)
       reaper.SetTrackColor(track, col)
     end
   end
+  -- Select the new track so chained "selected"-targeted commands act on it.
+  reaper.SetOnlyTrackSelected(track)
   return { ok = true, data = getTrackSummary(track, idx) }
 end
 
@@ -1146,6 +1148,8 @@ commands.createMidiTrack = function(args)
       reaper.SetTrackColor(track, col)
     end
   end
+  -- Select the new track so a chained insertMidiNotes (target "selected") lands here.
+  reaper.SetOnlyTrackSelected(track)
   return { ok = true, data = getTrackSummary(track, idx) }
 end
 
@@ -1648,6 +1652,21 @@ end
 ---------------------------------------------------------------------------
 -- Process pending commands
 ---------------------------------------------------------------------------
+-- Commands that must NOT create a REAPER undo point: read-only queries,
+-- undo/redo themselves, and transport/navigation (REAPER does not undo those).
+-- Everything else is a project mutation and is wrapped in an undo block so the
+-- app's Undo can reverse it (otherwise scripted changes never enter the history).
+local NO_UNDO_COMMANDS = {
+  ping = true, getProjectSummary = true, listTracks = true,
+  getSelectedTrack = true, getMarkersAndRegions = true, getTransportState = true,
+  getTrackFx = true, getTrackPeaks = true, getFxParameters = true,
+  getBufferSize = true, getDiskSpace = true, listTakes = true,
+  listAvailableTrackTemplates = true, listAvailableFxChains = true,
+  undo = true, redo = true,
+  play = true, stop = true, pause = true, record = true,
+  goToPosition = true, goToStart = true, goToEnd = true, goToMarker = true,
+}
+
 local function processCommands()
   local files = listFiles(COMMAND_DIR)
   for _, filename in ipairs(files) do
@@ -1659,11 +1678,16 @@ local function processCommands()
         local handler = commands[cmd.command]
         local result
         if handler then
+          local wrapUndo = not NO_UNDO_COMMANDS[cmd.command]
+          if wrapUndo then reaper.Undo_BeginBlock() end
           local ok, res = pcall(handler, cmd.args or {})
           if ok then
             result = res
           else
             result = { ok = false, errors = {tostring(res)} }
+          end
+          if wrapUndo then
+            reaper.Undo_EndBlock("SessionPilot: " .. cmd.command, -1)
           end
         else
           result = { ok = false, errors = {"Unknown command: " .. cmd.command} }
