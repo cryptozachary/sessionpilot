@@ -106,30 +106,28 @@ module.exports = {
   async execute(bridge, args = {}) {
     const tracksResult = await bridge.listTracks();
     const tracks = tracksResult.data || [];
-    const vocalTracks = tracks.filter(t => isVocalTrack(t.name));
-    const instrumentTracks = tracks.filter(t => isInstrumentTrack(t.name));
+    // Capture NAMES up front. Track ids are positional ("track_N") and every
+    // moveTrackToFolder reorders tracks, invalidating the ids of tracks not yet
+    // moved — so we re-resolve identity by name before each move.
+    const vocalNames = tracks.filter(t => isVocalTrack(t.name)).map(t => t.name);
+    const instrumentNames = tracks.filter(t => isInstrumentTrack(t.name)).map(t => t.name);
 
-    if (vocalTracks.length > 0) {
-      const vocalFolderResult = await bridge.createFolderTrack({ name: 'Vocals', color: VOCAL_COLOR });
-      const vocalFolderId = vocalFolderResult.data && vocalFolderResult.data.id;
-      for (const track of vocalTracks) {
-        if (vocalFolderId) {
-          await bridge.moveTrackToFolder({ trackId: track.id, folderId: vocalFolderId });
-        }
-        await bridge.setTrackColor({ trackId: track.id, color: VOCAL_COLOR });
+    async function groupInto(folderName, color, names) {
+      if (names.length === 0) return;
+      await bridge.createFolderTrack({ name: folderName, color });
+      for (const name of names) {
+        const list = (await bridge.listTracks()).data || [];
+        const folder = list.find(t => t.name === folderName && t.trackType === 'folder');
+        const track = list.find(t => t.name === name && t.trackType !== 'folder');
+        if (!folder || !track) continue;
+        // Colour first (no reorder), then nest (reorders — do it last per track).
+        await bridge.setTrackColor({ trackId: track.id, color });
+        await bridge.moveTrackToFolder({ trackId: track.id, folderId: folder.id });
       }
     }
 
-    if (instrumentTracks.length > 0) {
-      const instrumentFolderResult = await bridge.createFolderTrack({ name: 'Instruments', color: INSTRUMENT_COLOR });
-      const instrumentFolderId = instrumentFolderResult.data && instrumentFolderResult.data.id;
-      for (const track of instrumentTracks) {
-        if (instrumentFolderId) {
-          await bridge.moveTrackToFolder({ trackId: track.id, folderId: instrumentFolderId });
-        }
-        await bridge.setTrackColor({ trackId: track.id, color: INSTRUMENT_COLOR });
-      }
-    }
+    await groupInto('Vocals', VOCAL_COLOR, vocalNames);
+    await groupInto('Instruments', INSTRUMENT_COLOR, instrumentNames);
 
     return {
       workflow: 'organizeSessionTracks',

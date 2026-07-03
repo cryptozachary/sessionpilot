@@ -698,7 +698,12 @@ commands.duplicateTrack = function(args)
 end
 
 commands.createFolderTrack = function(args)
-  local idx = args.insertIndex or 0
+  -- Default to the END of the track list, not the top. A folder parent has
+  -- I_FOLDERDEPTH=1; if it's inserted above existing tracks with no closing
+  -- child yet, REAPER treats it as open and it absorbs every following track
+  -- (and stacks under other new folders). Creating it at the end leaves it
+  -- open but harmless until moveTrackToFolder nests tracks into it.
+  local idx = args.insertIndex or reaper.CountTracks(0)
   reaper.InsertTrackAtIndex(idx, true)
   local folder = reaper.GetTrack(0, idx)
   if args.name then
