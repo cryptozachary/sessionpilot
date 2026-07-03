@@ -20,9 +20,14 @@ Desktop.ini
 *.log
 npm-debug.log*
 
-# Environment
+# Environment (but keep the committed template)
 .env
 .env.*
+!.env.example
+
+# Runtime user data
+user_profile.json
+templates/
 
 # Build artifacts
 dist/

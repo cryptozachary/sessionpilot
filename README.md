@@ -6,10 +6,11 @@ AI Recording Workflow Assistant for REAPER DAW. SessionPilot's core promise is *
 
 ### AI Workflow Intelligence
 - Natural language recording assistant (text, voice, and quick-action buttons)
+- **Two assistant modes** ([details](#assistant-modes)) — a fast, deterministic **Default** mode, and an **AI Engineer** mode where an LLM agent inspects live session state and proposes multi-step plans you confirm before anything runs
 - Session intake flow — quick onboarding brief at the start of each session (goal + genre)
 - **"What should I do next?"** session advisor — context-aware suggestions based on current session state
 - Persistent user profile — remembers your preferred track style, punch-in method, genre, and custom notes across sessions
-- Optional Claude LLM fallback for ambiguous or complex messages
+- Optional Claude LLM fallback (Default mode) for ambiguous or complex messages
 - Context-aware fallback suggestions based on live session state
 
 ### Session Health Monitoring
@@ -81,6 +82,12 @@ npm start
 # Open http://localhost:3000
 ```
 
+Run the test suite (no extra dependencies — uses Node's built-in test runner):
+
+```
+npm test
+```
+
 ## Architecture Overview
 
 ```
@@ -91,7 +98,9 @@ npm start
                                    | REST + WebSocket
 +----------------------------------+-----------------------------------+
 |                       Express Backend                                |
-|  Chat Orchestrator -> AI Orchestrator (regex) -> LLM Planner (Claude)|
+|  Chat Orchestrator                                                   |
+|   - Default mode: AI Orchestrator (regex) -> LLM Planner (fallback)  |
+|   - AI mode: Agent Planner (Claude tool-use loop) + Tool Registry    |
 |  Workflow Service (17 workflows) | Music Theory | Template Service    |
 |  Action Routes (60+ bridge methods)                                  |
 +----------------------------------+-----------------------------------+
@@ -110,7 +119,7 @@ npm start
 
 - `server/` - Express backend
   - `bridge/` - REAPER bridge abstraction and implementations
-  - `services/` - AI orchestrator, chat orchestrator, workflow service, music theory, template service, session health check, intake service, user profile, preference parser, action log, session memory
+  - `services/` - AI orchestrator, chat orchestrator, workflow service, music theory, template service, session health check, intake service, user profile, preference parser, action log, session memory, and the AI-mode agent (agent planner, agent context, tool registry)
   - `workflows/` - Individual workflow handlers
   - `routes/` - REST API endpoints
   - `models/` - Data model factories
@@ -170,6 +179,8 @@ Extend `ReaperBridge` base class and implement all methods. The bridge contract 
 | POST | /api/session-templates/:id/load | Load a session template |
 | DELETE | /api/session-templates/:id | Delete a session template |
 | GET | /api/action-log | Recent action history |
+| GET | /api/assistant-mode | Current assistant mode (`default` or `ai`) |
+| POST | /api/assistant-mode | Switch assistant mode (`{ "mode": "default" \| "ai" }`) |
 
 ## WebSocket
 
