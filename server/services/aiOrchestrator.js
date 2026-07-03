@@ -450,8 +450,11 @@ function extractArgs(message, intent) {
           .filter(Boolean);
         cpArgs.chordNames = raw;
       } else {
-        // Find chord-like tokens anywhere in the message
-        const chordPattern = /\b([A-G][#b]?\s*(?:maj|min|m|dim|aug|sus|add|dom|7|9|11|13|major|minor|diminished|augmented|suspended)*(?:\d*)?)\b/gi;
+        // Find chord-like tokens anywhere in the message.
+        // Matched case-sensitively (uppercase A-G root + lowercase quality, e.g.
+        // "Am", "Cmaj7") so the English article "a" in phrases like "write a
+        // chord progression C Am F G" is not mistaken for an A chord.
+        const chordPattern = /\b([A-G][#b]?\s*(?:maj|min|m|dim|aug|sus|add|dom|7|9|11|13|major|minor|diminished|augmented|suspended)*(?:\d*)?)\b/g;
         const found = [];
         let m;
         while ((m = chordPattern.exec(message)) !== null) {
