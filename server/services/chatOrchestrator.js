@@ -29,6 +29,11 @@ async function expandWorkflowActions(bridge, actions) {
       const preview = await workflowService.previewWorkflow(bridge, a.workflow, a.args || {});
       if (preview.ok && preview.data && preview.data.proposedActions) {
         out.push(...preview.data.proposedActions);
+      } else if (!preview.ok) {
+        // Preview failed - don't silently drop the step. Push a passthrough
+        // marker so the user still sees something in the plan; it will run
+        // through the normal workflow path on confirm (or fail visibly there).
+        out.push({ type: a.workflow, args: a.args || {}, label: 'Run workflow: ' + a.workflow });
       }
     } else {
       out.push(a);

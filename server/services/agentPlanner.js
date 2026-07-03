@@ -63,7 +63,7 @@ async function runAgent({ client, bridge, message, history = [] }) {
   let finalText = '';
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const resp = await active.messages.create({ model: MODEL, max_tokens: 1024, system, tools, messages });
+    const resp = await active.messages.create({ model: MODEL, max_tokens: 2048, system, tools, messages });
 
     const textParts = (resp.content || []).filter((c) => c.type === 'text').map((c) => c.text);
     if (textParts.length) finalText = textParts.join('\n').trim();
@@ -78,9 +78,12 @@ async function runAgent({ client, bridge, message, history = [] }) {
       const def = byName[tu.name];
       if (def && def.kind === 'read') {
         let out;
+        let isError = false;
         try { out = await def.execute(bridge, tu.input || {}); }
-        catch (e) { out = { error: String((e && e.message) || e) }; }
-        toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 6000) });
+        catch (e) { out = { error: String((e && e.message) || e) }; isError = true; }
+        const toolResult = { type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out).slice(0, 6000) };
+        if (isError) toolResult.is_error = true;
+        toolResults.push(toolResult);
       } else if (def && def.kind === 'write') {
         proposedActions.push(def.toAction(tu.input || {}));
         toolResults.push({
