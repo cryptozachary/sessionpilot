@@ -37,8 +37,15 @@ const INTENT_PATTERNS = [
 
   // Troubleshooting
   {
-    patterns: [/can'?t.*hear/i, /no\s*(sound|audio|signal)/i, /monitor/i, /hear\s*(my|the)\s*(voice|input|mic)/i, /why.*no\s*sound/i, /not\s*hearing/i],
+    patterns: [/can'?t.*hear/i, /no\s*(sound|audio|signal)/i, /monitor\w*\s+(issue|problem|not\s|isn'?t|won'?t|broke)/i, /hear\s*(my|the)\s*(voice|input|mic)/i, /why.*no\s*sound/i, /not\s*hearing/i],
     intent: 'diagnose_monitoring', workflow: 'diagnoseMonitoringIssue', actionType: 'advice'
+  },
+  // Monitoring on/off toggle. The diagnostic above was narrowed so plain
+  // "turn on/off monitoring" falls through to this toggle instead of the
+  // troubleshooter; "can't hear myself" still routes to the diagnostic.
+  {
+    patterns: [/\b(turn|switch)\s*(on|off)\s*(input\s*)?monitor/i, /\bmonitor(?:ing)?\s*(on|off)\b/i, /\benable\s*(input\s*)?monitor/i, /\bdisable\s*(input\s*)?monitor/i, /\bmonitor(?:ing)?\s*(this|the|my)\b/i],
+    intent: 'toggle_monitoring', actionType: 'safe_action'
   },
   {
     patterns: [/low\s*(input|level|volume|gain|signal)/i, /quiet/i, /too\s*low/i, /barely\s*hear/i, /weak\s*signal/i, /input.*low/i],
@@ -65,7 +72,7 @@ const INTENT_PATTERNS = [
 
   // Mark song structure
   {
-    patterns: [/mark.*structure/i, /song\s*structure/i, /section.*marker/i, /mark.*sections?/i, /verse.*chorus/i, /mark.*verse/i, /mark.*chorus/i, /mark.*bridge/i, /map.*song/i],
+    patterns: [/\bmark\b.*structure/i, /song\s*structure/i, /section\s*markers?\b/i, /\bmark\b.*sections?/i, /verse.*chorus/i, /\bmark\b.*verse/i, /\bmark\b.*chorus/i, /\bmark\b.*bridge/i, /map.*song/i],
     intent: 'mark_song_structure', workflow: 'markSongStructure', actionType: 'safe_action'
   },
 
@@ -83,7 +90,7 @@ const INTENT_PATTERNS = [
 
   // FX chain management
   {
-    patterns: [/fx\s*chain/i, /plug-?ins?/i, /effect/i, /add.*(?:comp|eq|reverb|delay)/i, /remove.*fx/i, /bypass.*fx/i, /show.*fx/i, /what.*fx/i, /manage.*fx/i],
+    patterns: [/fx\s*chain/i, /plug-?ins?/i, /effect/i, /add.*(?:comp|eq|reverb|delay)/i, /remove.*fx/i, /bypass.*fx/i, /show.*fx/i, /what.*fx/i, /manage.*fx/i, /\b(remove|bypass|disable)\s+(the\s+)?\w*\s*(reverb|delay|eq|comp|compressor|limiter|saturator|plugin|effect)\b/i],
     intent: 'manage_fx_chain', workflow: 'manageFxChain', actionType: 'needs_confirmation'
   },
 
@@ -141,7 +148,7 @@ const INTENT_PATTERNS = [
     intent: 'transport_pause', actionType: 'safe_action'
   },
   {
-    patterns: [/\bstart\s*record/i, /\bhit\s*record\b/i, /\bpress\s*record\b/i, /\broll\s*tape\b/i, /\brecord\s*now\b/i, /\blet'?s?\s*record\b/i],
+    patterns: [/\bstart\s*record/i, /\bhit\s*record\b/i, /\bpress\s*record\b/i, /\broll\s*tape\b/i, /\brecord\s*now\b/i, /\blet'?s?\s*record\b/i, /^\s*record[\s.!]*$/i],
     intent: 'transport_record', actionType: 'safe_action'
   },
   {
@@ -164,11 +171,11 @@ const INTENT_PATTERNS = [
 
   // Volume / pan controls
   {
-    patterns: [/\b(turn|set|bring)\s*(up|down)\s*(the\s*)?(volume|level|fader)/i, /\bvolume\b.*\b(up|down|\d)/i, /\b(louder|quieter|softer)\b/i, /\bset\s*(the\s*)?volume\b/i],
+    patterns: [/\b(turn|set|bring)\s*(up|down)\s*(the\s*)?(volume|level|fader)/i, /\bvolume\b.*\b(up|down|\d)/i, /\b(louder|quieter|softer)\b/i, /\bset\s*(the\s*)?volume\b/i, /\bturn\s+(it\s+|the\s+\w+\s+)?(up|down)\b/i, /\bbring\s+(it\s+|the\s+\w+\s+)?(up|down)\b/i],
     intent: 'set_volume', actionType: 'safe_action'
   },
   {
-    patterns: [/\bpan\s*(left|right|center|centre|\d)/i, /\bset\s*(the\s*)?pan\b/i, /\bpan\s*(it|the|this)/i],
+    patterns: [/\bpan\s*(left|right|center|centre|\d)/i, /\bset\s*(the\s*)?pan\b/i, /\bpan\s*(it|the|this)/i, /\bpan\b.*\b(left|right|center|centre|hard|wide)/i],
     intent: 'set_pan', actionType: 'safe_action'
   },
 
@@ -211,11 +218,15 @@ const INTENT_PATTERNS = [
   },
 
   // Simple track actions
-  { patterns: [/arm\s*(the\s*)?track/i, /arm\s*it/i], intent: 'arm_track', actionType: 'safe_action' },
-  { patterns: [/disarm/i, /un-?arm/i], intent: 'disarm_track', actionType: 'safe_action' },
-  { patterns: [/rename.*track/i, /call\s*(it|the\s*track)/i], intent: 'rename_track', actionType: 'safe_action' },
+  // Arm/disarm — \barm\b avoids matching inside "disarm"/"unarm"
+  { patterns: [/\barm\b.*\btrack\b/i, /\barm\s+(it|this|that|these|them)\b/i, /record[- ]?enable/i], intent: 'arm_track', actionType: 'safe_action' },
+  { patterns: [/\bdisarm/i, /\bun-?arm/i, /record[- ]?disable/i], intent: 'disarm_track', actionType: 'safe_action' },
+  // Mute/solo (enabled vs disabled resolved from the message in the handler)
+  { patterns: [/\bmute\b/i, /\bunmute\b/i, /\bun-?mute\b/i], intent: 'mute_track', actionType: 'safe_action' },
+  { patterns: [/\bsolo\b/i, /\bunsolo\b/i, /\bun-?solo\b/i], intent: 'solo_track', actionType: 'safe_action' },
+  { patterns: [/rename.*track/i, /\bcall\s+(it|this|that|the)\s+(track\b|\w+\s+track\b)/i], intent: 'rename_track', actionType: 'safe_action' },
   { patterns: [/create\s*(a\s*)?track/i, /new\s*track/i, /add\s*(a\s*)?track/i], intent: 'create_track', actionType: 'safe_action' },
-  { patterns: [/duplicate/i, /copy\s*(the\s*)?track/i], intent: 'duplicate_track', actionType: 'safe_action' },
+  { patterns: [/duplicate/i, /\bcopy\s+(this|that|the)?\s*track/i], intent: 'duplicate_track', actionType: 'safe_action' },
   { patterns: [/marker/i, /drop\s*(a\s*)?marker/i], intent: 'insert_marker', actionType: 'safe_action' },
   {
     patterns: [/what.*session/i, /session\s*(info|status|summary)/i, /project\s*(info|status|summary)/i, /show.*track/i],
@@ -693,6 +704,66 @@ async function handleDirectAction(bridge, matched, message) {
           type: 'disarmTrack',
           args: { trackIndex: selected.data.index },
           label: `Disarm "${trackName}"`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'toggle_monitoring': {
+      const selected = await bridge.getSelectedTrack();
+      if (!selected.ok || !selected.data) {
+        return buildResponse("Select a track first and I'll toggle its input monitoring.", [], 'advice', baseContext);
+      }
+      const trackName = selected.data.name || 'Track ' + selected.data.index;
+      const enabled = !/\b(off|disable)\b/i.test(message);
+      return buildResponse(
+        `I'll turn input monitoring ${enabled ? 'on' : 'off'} for "${trackName}".`,
+        [{
+          type: 'toggleMonitoring',
+          args: { trackIndex: selected.data.index, enabled },
+          label: `Monitoring ${enabled ? 'on' : 'off'} for "${trackName}"`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'mute_track': {
+      const selected = await bridge.getSelectedTrack();
+      if (!selected.ok || !selected.data) {
+        return buildResponse("Select the track you want to mute or unmute first.", [], 'advice', baseContext);
+      }
+      const trackName = selected.data.name || 'Track ' + selected.data.index;
+      const enabled = !/\bun-?mute\b/i.test(message);
+      return buildResponse(
+        `I'll ${enabled ? 'mute' : 'unmute'} "${trackName}".`,
+        [{
+          type: 'muteTrack',
+          args: { trackIndex: selected.data.index, enabled },
+          label: `${enabled ? 'Mute' : 'Unmute'} "${trackName}"`,
+          requiresConfirmation: false
+        }],
+        matched.actionType,
+        baseContext
+      );
+    }
+
+    case 'solo_track': {
+      const selected = await bridge.getSelectedTrack();
+      if (!selected.ok || !selected.data) {
+        return buildResponse("Select the track you want to solo or unsolo first.", [], 'advice', baseContext);
+      }
+      const trackName = selected.data.name || 'Track ' + selected.data.index;
+      const enabled = !/\bun-?solo\b/i.test(message);
+      return buildResponse(
+        `I'll ${enabled ? 'solo' : 'unsolo'} "${trackName}".`,
+        [{
+          type: 'soloTrack',
+          args: { trackIndex: selected.data.index, enabled },
+          label: `${enabled ? 'Solo' : 'Unsolo'} "${trackName}"`,
           requiresConfirmation: false
         }],
         matched.actionType,
