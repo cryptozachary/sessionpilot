@@ -410,6 +410,8 @@ local function getTrackSummary(track, index)
   local isSolo = reaper.GetMediaTrackInfo_Value(track, "I_SOLO") > 0
   local isArmed = reaper.GetMediaTrackInfo_Value(track, "I_RECARM") == 1
   local monitoringOn = reaper.GetMediaTrackInfo_Value(track, "I_RECMON") > 0
+  local volume = reaper.GetMediaTrackInfo_Value(track, "D_VOL")
+  local pan = reaper.GetMediaTrackInfo_Value(track, "D_PAN")
   local folderDepth = reaper.GetMediaTrackInfo_Value(track, "I_FOLDERDEPTH")
   local itemCount = reaper.CountTrackMediaItems(track)
   local fxCount = reaper.TrackFX_GetCount(track)
@@ -480,6 +482,8 @@ local function getTrackSummary(track, index)
     trackType = trackType,
     midiInput = midiInput,
     instrumentPlugin = instrumentPlugin,
+    volume = volume,
+    pan = pan,
     peakL = peakL,
     peakR = peakR
   }
