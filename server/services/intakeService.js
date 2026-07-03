@@ -41,11 +41,13 @@ function handleIntakeMessage(message, intake, isCommandMessage) {
     intake = { started: false, complete: false, answers: {}, currentQuestion: null };
   }
 
-  // If the user typed a real command on the very first message, bypass intake
-  if (!intake.started && isCommandMessage) {
+  // If the user issues a real command at ANY point during intake, honor it:
+  // bypass intake and let the command run rather than absorbing it as an answer
+  // (e.g. "punch the chorus" typed instead of answering the genre question).
+  if (isCommandMessage) {
     return {
       message: null,
-      newIntakeState: { started: true, complete: true, answers: {}, currentQuestion: null }
+      newIntakeState: { started: true, complete: true, answers: intake.answers || {}, currentQuestion: null }
     };
   }
 
