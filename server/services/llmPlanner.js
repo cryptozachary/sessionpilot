@@ -300,7 +300,7 @@ async function planWithLLM(message, context) {
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 300,
       system: LLM_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: `${contextLine}\n\nUser: ${message}` }]
@@ -392,7 +392,7 @@ async function planAdvisor({ message, context }) {
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 200,
       system: ADVISOR_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: `${contextLine}\n\nUser: ${message}` }]
