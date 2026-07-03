@@ -1636,12 +1636,17 @@ commands.goToMarker = function(args)
 end
 
 commands.moveTrackToFolder = function(args)
-  -- In REAPER, moving tracks into folders involves reordering tracks and setting folder depth.
-  -- This is a simplified version that sets the parent relationship.
+  -- NOTE: robust folder nesting is a design-level change, not a drop-in here.
+  -- REAPER folders are defined by track ORDER + I_FOLDERDEPTH (parent=1,
+  -- children=0, last child=-1). This app's createFolderTrack can make "empty"
+  -- folders (depth 1 with no -1 closer), which REAPER treats as open — they
+  -- absorb every following track — and folders are inserted at the top while
+  -- new tracks append at the bottom. A correct move therefore requires
+  -- redesigning createFolderTrack (never leave a folder open) together with a
+  -- reorder+depth-repair pass. Until then this acknowledges the request rather
+  -- than performing unsafe reordering.
   local trackId = args.trackId
   local folderId = args.folderId
-  -- For the file-based bridge, track reordering is complex.
-  -- This command acknowledges the intent; full reordering may need manual adjustment.
   return {
     ok = true,
     data = { trackId = trackId, folderId = folderId, note = "Track folder assignment noted. Manual track reordering may be needed in REAPER." },
