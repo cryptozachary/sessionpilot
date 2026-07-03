@@ -32,6 +32,10 @@ window.SessionPilot.API = (() => {
     getHealth:     () => request('GET', '/api/health'),
     getActionLog: (limit = 50) => request('GET', `/api/action-log?limit=${limit}`),
 
+    // Assistant mode
+    getAssistantMode: () => request('GET', '/api/assistant-mode'),
+    setAssistantMode: (mode) => request('POST', '/api/assistant-mode', { mode }),
+
     // Chat
     sendChat: (message, metadata = {}) => request('POST', '/api/chat', { message, ...metadata }),
 
