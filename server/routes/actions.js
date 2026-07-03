@@ -177,6 +177,8 @@ const DIRECT_ACTION_MAP = {
   getTrackPeaks: async (bridge) => bridge.getTrackPeaks()
 };
 
+const DIRECT_ACTION_NAMES = Object.keys(DIRECT_ACTION_MAP);
+
 module.exports = function createActionRoutes(bridge) {
   const router = require('express').Router();
 
@@ -286,3 +288,5 @@ module.exports = function createActionRoutes(bridge) {
 
   return router;
 };
+
+module.exports.DIRECT_ACTION_NAMES = DIRECT_ACTION_NAMES;
