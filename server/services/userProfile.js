@@ -4,7 +4,8 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const PROFILE_PATH = path.join(process.cwd(), 'user_profile.json');
+const PROFILE_PATH = process.env.USER_PROFILE_PATH
+  || path.join(process.cwd(), 'user_profile.json');
 
 const DEFAULT_PROFILE = {
   preferredTrackStyle: null,  // 'dry' | 'wet'
@@ -13,10 +14,15 @@ const DEFAULT_PROFILE = {
   namingConventions: null,    // e.g. 'Lead Vox / Dbl L / Dbl R'
   preferredOctave: null,      // number
   genre: null,                // e.g. 'hip-hop', 'pop', 'r&b'
-  notes: []                   // freeform remembered facts (max 20)
+  notes: [],                  // freeform remembered facts (max 20)
+  assistantMode: 'default'    // 'default' | 'ai'
 };
 
 const KNOWN_FIELDS = new Set(Object.keys(DEFAULT_PROFILE));
+
+const FIELD_VALIDATORS = {
+  assistantMode: (v) => v === 'default' || v === 'ai'
+};
 
 async function load() {
   try {
@@ -37,6 +43,10 @@ async function save(profile) {
 async function updateField(key, value) {
   if (!KNOWN_FIELDS.has(key)) {
     throw new Error(`Unknown profile field: ${key}`);
+  }
+  const validator = FIELD_VALIDATORS[key];
+  if (validator && !validator(value)) {
+    return load();
   }
   const profile = await load();
   profile[key] = value;

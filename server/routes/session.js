@@ -3,6 +3,7 @@
 
 const workflowService = require('../services/workflowService');
 const templateService = require('../services/templateService');
+const userProfile = require('../services/userProfile');
 
 module.exports = function createSessionRoutes(bridge) {
   const router = require('express').Router();
@@ -163,6 +164,32 @@ module.exports = function createSessionRoutes(bridge) {
     try {
       const result = workflowService.listWorkflows();
       res.json({ ok: true, data: result });
+    } catch (e) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Assistant Mode
+  // ---------------------------------------------------------------------------
+
+  router.get('/api/assistant-mode', async (req, res) => {
+    try {
+      const p = await userProfile.load();
+      res.json({ ok: true, data: { mode: p.assistantMode || 'default' } });
+    } catch (e) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
+  router.post('/api/assistant-mode', async (req, res) => {
+    try {
+      const mode = req.body && req.body.mode;
+      if (mode !== 'default' && mode !== 'ai') {
+        return res.json({ ok: false, error: 'mode must be "default" or "ai"' });
+      }
+      const p = await userProfile.updateField('assistantMode', mode);
+      res.json({ ok: true, data: { mode: p.assistantMode } });
     } catch (e) {
       res.json({ ok: false, error: e.message });
     }
