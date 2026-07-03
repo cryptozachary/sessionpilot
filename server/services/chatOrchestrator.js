@@ -8,6 +8,34 @@ const sessionMemory = require('./sessionMemory');
 const { buildSessionContext } = require('./contextBuilder');
 const planner = require('./llmPlanner');
 const intakeService = require('./intakeService');
+const { runAgent } = require('./agentPlanner');
+const userProfile = require('./userProfile');
+
+// Intents cheap and unambiguous enough to always run deterministically,
+// even in AI mode (instant + free) - no need to round-trip through the agent.
+const FAST_PATH_INTENTS = new Set([
+  'transport_play', 'transport_stop', 'transport_pause', 'transport_record',
+  'transport_goto_start', 'transport_goto_end', 'transport_goto_bar',
+  'arm_track', 'disarm_track', 'mute_track', 'solo_track', 'toggle_monitoring',
+  'undo', 'redo', 'goto_marker'
+]);
+
+// Expands agent __workflow__ placeholders into real workflow previews; other
+// proposed action types are passed through unchanged.
+async function expandWorkflowActions(bridge, actions) {
+  const out = [];
+  for (const a of actions || []) {
+    if (a.type === '__workflow__') {
+      const preview = await workflowService.previewWorkflow(bridge, a.workflow, a.args || {});
+      if (preview.ok && preview.data && preview.data.proposedActions) {
+        out.push(...preview.data.proposedActions);
+      }
+    } else {
+      out.push(a);
+    }
+  }
+  return out;
+}
 
 function shouldAugmentWithPlanner(matchedIntent, extractedArgs) {
   if (!matchedIntent) {
@@ -272,7 +300,27 @@ module.exports = {
     let response;
     let plannerResponse = null;
 
-    if (shouldAugmentWithPlanner(matchedIntent, extractedArgs)) {
+    // ── AI mode: route non-trivial messages to the agent ──────────────────────
+    // Trivial, unambiguous commands still run the deterministic rule-based path
+    // (instant + free) even when the assistant is in AI mode.
+    const profile = await userProfile.load();
+    const isFastPath = Boolean(matchedIntent && FAST_PATH_INTENTS.has(matchedIntent.intent));
+    if (profile.assistantMode === 'ai' && !isFastPath) {
+      const agentFn = options.__agentOverride || runAgent;
+      const agentResult = await agentFn({ bridge, message, history: [] });
+      if (agentResult) {
+        const proposedActions = await expandWorkflowActions(bridge, agentResult.proposedActions);
+        response = createAssistantResponse({
+          message: agentResult.message,
+          proposedActions,
+          requiresConfirmation: agentResult.requiresConfirmation,
+          actionType: agentResult.requiresConfirmation ? 'needs_confirmation' : 'advice',
+          context: { route: 'agent', intent: 'agent' }
+        });
+      }
+    }
+
+    if (!response && shouldAugmentWithPlanner(matchedIntent, extractedArgs)) {
       // session_advisor: try LLM advisor, fall back to heuristic
       if (matchedIntent && matchedIntent.intent === 'session_advisor') {
         const advisorPlan = await planner.planAdvisor({ message, context: contextSnapshot });
