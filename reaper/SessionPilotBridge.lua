@@ -1423,6 +1423,24 @@ commands.pause = function(args)
 end
 
 commands.record = function(args)
+  args = args or {}
+  -- Guard: recording with no armed tracks makes REAPER pop a modal
+  -- "Record Warning" dialog, which blocks this script's defer loop until a
+  -- human dismisses it — freezing the bridge. Refuse up front (unless forced)
+  -- since recording with nothing armed captures nothing anyway.
+  local armedCount = 0
+  for i = 0, reaper.CountTracks(0) - 1 do
+    if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), "I_RECARM") == 1 then
+      armedCount = armedCount + 1
+    end
+  end
+  if armedCount == 0 and not args.force then
+    return {
+      ok = false,
+      data = { state = "stopped", blocked = true, reason = "no_armed_tracks", armedCount = 0 },
+      errors = {"No tracks are armed for recording. Arm a track first (nothing would be captured otherwise)."}
+    }
+  end
   -- Action 1013: Transport: Record
   reaper.Main_OnCommand(1013, 0)
   local playState = reaper.GetPlayState()

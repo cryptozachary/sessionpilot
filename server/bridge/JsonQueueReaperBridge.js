@@ -522,8 +522,8 @@ class JsonQueueReaperBridge extends ReaperBridge {
     return this._sendCommand('pause');
   }
 
-  async record() {
-    return this._sendCommand('record');
+  async record(args = {}) {
+    return this._sendCommand('record', { force: Boolean(args.force) });
   }
 
   async goToPosition({ position, bar } = {}) {

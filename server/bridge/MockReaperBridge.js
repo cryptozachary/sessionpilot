@@ -773,8 +773,20 @@ class MockReaperBridge extends ReaperBridge {
     }, [], [], { bridgeType: BRIDGE_TYPES.MOCK });
   }
 
-  async record() {
+  async record(args = {}) {
     await this._simulateLatency();
+    // Mirror the real bridge's guard: refuse to record with no armed tracks
+    // (unless forced) so behaviour is consistent in dev/mock mode.
+    const armedCount = (this._tracks || []).filter((t) => t.isArmed).length;
+    if (armedCount === 0 && !args.force) {
+      return this._result(
+        false,
+        { state: 'stopped', blocked: true, reason: 'no_armed_tracks', armedCount: 0 },
+        [],
+        ['No tracks are armed for recording. Arm a track first (nothing would be captured otherwise).'],
+        { bridgeType: BRIDGE_TYPES.MOCK }
+      );
+    }
     this._transportState = 'recording';
     return this._result(true, {
       state: this._transportState,
