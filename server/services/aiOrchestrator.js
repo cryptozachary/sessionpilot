@@ -261,24 +261,35 @@ const INTENT_PATTERNS = [
  * Returns the first matching pattern entry or null.
  */
 function classifyIntent(message) {
-  // A structured preference statement (e.g. "I punch in by region") must win
-  // over workflow intents that share keywords — otherwise "punch in by region"
-  // is captured by the punch-in workflow before the preference is ever saved.
-  const { parsePreference } = require('./preferenceParser');
-  const pref = parsePreference(message);
-  if (pref && pref.field !== 'notes') {
-    const prefIntent = INTENT_PATTERNS.find((e) => e.intent === 'remember_preference');
-    if (prefIntent) return prefIntent;
-  }
-
+  let workflowMatch = null;
   for (const entry of INTENT_PATTERNS) {
     for (const pattern of entry.patterns) {
       if (pattern.test(message)) {
-        return entry;
+        workflowMatch = entry;
+        break;
       }
     }
+    if (workflowMatch) break;
   }
-  return null;
+
+  // A structured preference should be saved rather than executed when it either
+  // collides with a punch-in workflow keyword ("I punch in by region" would
+  // otherwise run the punch-in workflow) or when nothing else matched at all
+  // ("my genre is R&B"). It must NOT hijack a real command that merely contains
+  // a preference-like token — e.g. "scale in octave 3" stays create_scale_run.
+  const { parsePreference } = require('./preferenceParser');
+  const pref = parsePreference(message);
+  if (pref && pref.field !== 'notes') {
+    const punchCollision =
+      workflowMatch &&
+      (workflowMatch.intent === 'prepare_punch_in' || workflowMatch.intent === 'quick_punch_loop') &&
+      pref.field === 'punchInStyle';
+    if (!workflowMatch || punchCollision) {
+      return INTENT_PATTERNS.find((e) => e.intent === 'remember_preference') || workflowMatch;
+    }
+  }
+
+  return workflowMatch;
 }
 
 /**
@@ -447,9 +458,18 @@ function extractArgs(message, intent) {
 
     case 'create_chord_progression': {
       const cpArgs = {};
+      // Strip note-duration / velocity modifiers first so a trailing clause like
+      // "with half notes" isn't mistaken for the "with <chords>" delimiter
+      // (e.g. "write chords Dm7, G7, Cmaj7 with half notes"). Duration/velocity
+      // are parsed separately below, off the original message.
+      const chordText = message
+        .replace(/\b(?:with|in|as|using)\s+(?:whole|half|quarter|eighth|sixteenth)\s*notes?\b/gi, ' ')
+        .replace(/\b(?:whole|half|quarter|eighth|sixteenth)\s*notes?\b/gi, ' ')
+        .replace(/\b\d+\s*beats?\s*(?:per|each)?\b/gi, ' ')
+        .replace(/\b(?:soft|loud|velocity\s+\d+)\b/gi, ' ');
       // Extract chord names: prefer "with/using" as delimiter, fall back to "chords:" or generic
-      const withMatch = message.match(/(?:with|using)\s+(.+)/i);
-      const colonMatch = !withMatch && message.match(/(?:chords?|progression)\s*[:]\s*(.+)/i);
+      const withMatch = chordText.match(/(?:with|using)\s+(.+)/i);
+      const colonMatch = !withMatch && chordText.match(/(?:chords?|progression)\s*[:]\s*(.+)/i);
       const chordSection = withMatch || colonMatch;
       if (chordSection) {
         const raw = chordSection[1]
@@ -467,7 +487,7 @@ function extractArgs(message, intent) {
         const chordPattern = /\b([A-G][#b]?\s*(?:maj|min|m|dim|aug|sus|add|dom|7|9|11|13|major|minor|diminished|augmented|suspended)*(?:\d*)?)\b/g;
         const found = [];
         let m;
-        while ((m = chordPattern.exec(message)) !== null) {
+        while ((m = chordPattern.exec(chordText)) !== null) {
           found.push(m[1].trim());
         }
         if (found.length > 0) cpArgs.chordNames = found;
