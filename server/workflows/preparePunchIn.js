@@ -5,7 +5,11 @@ module.exports = {
   description: 'Set up REAPER for a punch-in recording over a specified bar range.',
 
   async preview(bridge, args = {}) {
-    const { startBar, endBar, trackId } = args;
+    const { trackId } = args;
+    // Default to a 4-bar punch when bars are unspecified so labels/markers
+    // never render as "bar undefined".
+    const startBar = Number.isFinite(args.startBar) ? args.startBar : 1;
+    const endBar = Number.isFinite(args.endBar) ? args.endBar : startBar + 4;
     const trackLabel = trackId ? `track ${trackId}` : 'the selected track';
 
     const proposedActions = [
@@ -73,7 +77,11 @@ module.exports = {
   },
 
   async execute(bridge, args = {}) {
-    const { startBar, endBar, trackId } = args;
+    const { trackId } = args;
+    // Default to a 4-bar punch when bars are unspecified so labels/markers
+    // never render as "bar undefined".
+    const startBar = Number.isFinite(args.startBar) ? args.startBar : 1;
+    const endBar = Number.isFinite(args.endBar) ? args.endBar : startBar + 4;
 
     const selectedTrackResult = await bridge.getSelectedTrack();
     const resolvedTrackId = trackId || (selectedTrackResult.data && selectedTrackResult.data.id);

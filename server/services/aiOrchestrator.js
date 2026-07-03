@@ -261,6 +261,16 @@ const INTENT_PATTERNS = [
  * Returns the first matching pattern entry or null.
  */
 function classifyIntent(message) {
+  // A structured preference statement (e.g. "I punch in by region") must win
+  // over workflow intents that share keywords — otherwise "punch in by region"
+  // is captured by the punch-in workflow before the preference is ever saved.
+  const { parsePreference } = require('./preferenceParser');
+  const pref = parsePreference(message);
+  if (pref && pref.field !== 'notes') {
+    const prefIntent = INTENT_PATTERNS.find((e) => e.intent === 'remember_preference');
+    if (prefIntent) return prefIntent;
+  }
+
   for (const entry of INTENT_PATTERNS) {
     for (const pattern of entry.patterns) {
       if (pattern.test(message)) {
