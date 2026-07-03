@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ConfirmModal,
     ActionLog,
     VoiceControl,
+    ModeToggle,
     KeyboardShortcuts,
     HelpOverlay
   } = window.SessionPilot;
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ConfirmModal.init();
   ActionLog.init();
   VoiceControl.init();
+  ModeToggle.init();
   KeyboardShortcuts.init();
   HelpOverlay.init();
 

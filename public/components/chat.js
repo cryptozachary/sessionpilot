@@ -118,13 +118,22 @@ window.SessionPilot.Chat = (() => {
           const pending = {
             actions: proposedActions,
             context: derivePendingContext(response, proposedActions),
-            requiresConfirmation
+            requiresConfirmation,
+            // Multi-step agent plans (N>1) are rendered/executed as a single
+            // ordered unit; single-action responses keep the existing path.
+            isPlan: proposedActions.length > 1
           };
 
           if (options.autoExecuteSafeActions && !requiresConfirmation) {
-            await PendingActions().execute(pending, {
-              label: (pending.context && (pending.context.workflow || pending.context.actionType)) || 'Voice command'
-            });
+            const label = (pending.context && (pending.context.workflow || pending.context.actionType)) || 'Voice command';
+            if (pending.isPlan) {
+              // Run every step in order via the sequential plan executor so
+              // steps after the first aren't silently dropped.
+              await window.SessionPilot.ActionQueue.executePlan(pending.actions, { label });
+              State().set('pendingActions', []);
+            } else {
+              await PendingActions().execute(pending, { label });
+            }
           } else {
             State().set('pendingActions', pending);
           }

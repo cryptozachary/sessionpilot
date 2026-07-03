@@ -57,6 +57,22 @@ AI Recording Workflow Assistant for REAPER DAW. SessionPilot's core promise is *
 - Voice command help overlay (press ? or click help button)
 - Real-time session state display via WebSocket with file-change-driven updates
 
+## Assistant Modes
+
+SessionPilot runs in one of two modes, switchable at any time from the **Mode: Default / Mode: AI Engineer** toggle in the UI. Your choice is saved per user in `user_profile.json`, so it persists across sessions.
+
+### Default mode (default)
+
+Deterministic, regex-first command routing with a narrow LLM fallback for ambiguous phrasing. No round-trip to an LLM for most commands, so it's fast, free, and private. Best when you want quick, predictable, hands-on control of the session.
+
+### AI Engineer mode
+
+Routes non-trivial requests to an LLM agent (`claude-sonnet-5`, with prompt caching to keep cost down) that can inspect live session state — tracks, FX, takes, transport — and propose a multi-step plan for you to review before anything runs. Trivial, unambiguous commands (play, stop, arm, mute, solo, undo/redo, transport navigation, etc.) still execute instantly and deterministically even while in AI mode — they don't need to go through the agent. Reads (inspecting the session) happen automatically as the agent reasons; any action that changes your session always requires your confirmation first.
+
+### Requirements and cost
+
+AI Engineer mode requires `ANTHROPIC_API_KEY` to be set on an account with API credits. It uses `claude-sonnet-5` with prompt caching to keep per-request cost low. If the key is missing or the account has no credits, AI mode degrades gracefully to Default-mode behavior rather than failing.
+
 ## Quick Start
 
 ```
@@ -110,7 +126,7 @@ npm start
 |----------|---------|-------------|
 | `USE_REAL_BRIDGE` | `0` | Set to `1` to use the JSON queue bridge with a real REAPER instance |
 | `REAPER_BRIDGE_DIR` | `./reaper_bridge` | Path to the bridge directory (commands/results/state.json) |
-| `ANTHROPIC_API_KEY` | (none) | Optional. Enables Claude LLM fallback and AI session advisor |
+| `ANTHROPIC_API_KEY` | (none) | Optional for Default mode (enables Claude LLM fallback and AI session advisor). **Required for AI Engineer mode** — see [Assistant Modes](#assistant-modes). |
 | `SESSIONPILOT_PLANNER_MODE` | `heuristic` | `heuristic` (default), `heuristic-only` (no LLM), or `off` |
 | `PORT` | `3000` | Server port |
 
