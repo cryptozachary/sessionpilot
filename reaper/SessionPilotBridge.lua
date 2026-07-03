@@ -846,16 +846,20 @@ commands.listTakes = function(args)
     local takes = {}
     for j = 0, takeCount - 1 do
       local take = reaper.GetMediaItemTake(item, j)
-      local _, takeName = reaper.GetSetMediaItemTakeInfo_String(take, "P_NAME", "", false)
-      local takeLen = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
-      local isActive = (take == activeTake)
-      if isActive then activeTakeIdx = j end
-      takes[#takes + 1] = {
-        index = j,
-        name = takeName,
-        length = takeLen,
-        isActive = isActive
-      }
+      -- Empty take lanes return a nil take; skip them so we don't pass nil to
+      -- GetSetMediaItemTakeInfo_String (which errors).
+      if take then
+        local _, takeName = reaper.GetSetMediaItemTakeInfo_String(take, "P_NAME", "", false)
+        local takeLen = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
+        local isActive = (take == activeTake)
+        if isActive then activeTakeIdx = j end
+        takes[#takes + 1] = {
+          index = j,
+          name = takeName,
+          length = takeLen,
+          isActive = isActive
+        }
+      end
     end
 
     items[#items + 1] = {
@@ -934,12 +938,9 @@ commands.setLoopPoints = function(args)
   endPos = endPos or 0
   -- GetSet_LoopTimeRange(isSet, isLoop, start, end, allowAutoSeek)
   reaper.GetSet_LoopTimeRange(true, true, startPos, endPos, false)
-  -- Enable or disable repeat/loop
-  if args.enabled then
-    reaper.SetRepeatState(1)
-  else
-    reaper.SetRepeatState(0)
-  end
+  -- Enable or disable repeat/loop. SetRepeatState does not exist in ReaScript;
+  -- GetSetRepeat(1)=on, GetSetRepeat(0)=off.
+  reaper.GetSetRepeat(args.enabled and 1 or 0)
   return {
     ok = true,
     data = {
