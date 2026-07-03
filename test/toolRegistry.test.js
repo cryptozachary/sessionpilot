@@ -40,3 +40,24 @@ test('last tool carries cache_control', () => {
   const { tools } = buildTools();
   assert.deepStrictEqual(tools[tools.length - 1].cache_control, { type: 'ephemeral' });
 });
+
+test('resolveTrackId falls back to the selected track when nothing is supplied', async () => {
+  const MockReaperBridge = require('../server/bridge/MockReaperBridge');
+  const bridge = new MockReaperBridge();
+
+  // Pick a real track and select it.
+  const tracks = (await bridge.listTracks()).data;
+  const target = tracks[2];
+  await bridge.selectTrack({ trackId: target.id });
+
+  // No trackId / trackIndex / target — should resolve to the selected track.
+  const resolved = await actions.resolveTrackId(bridge, {});
+  assert.strictEqual(resolved, target.id);
+
+  // Reproduction of the original bug: muteTrack({}) previously errored with
+  // "Track not found: null". With the fallback it now succeeds.
+  const muteArgs = { trackId: await actions.resolveTrackId(bridge, {}), enabled: true };
+  const result = await bridge.muteTrack(muteArgs);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.data.id, target.id);
+});

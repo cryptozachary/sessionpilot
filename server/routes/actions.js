@@ -25,11 +25,10 @@ async function resolveTrackId(bridge, args = {}) {
     }
     return `track_${args.trackIndex}`;
   }
-  if (args.target === 'selected') {
-    const selected = await bridge.getSelectedTrack();
-    return selected.data && selected.data.id;
-  }
-  return null;
+  // No trackId/trackIndex, and either target:'selected' or nothing at all —
+  // default to the currently selected track.
+  const selected = await bridge.getSelectedTrack();
+  return (selected && selected.data && selected.data.id) || null;
 }
 
 // Map of direct action types to bridge method calls
@@ -290,3 +289,4 @@ module.exports = function createActionRoutes(bridge) {
 };
 
 module.exports.DIRECT_ACTION_NAMES = DIRECT_ACTION_NAMES;
+module.exports.resolveTrackId = resolveTrackId;

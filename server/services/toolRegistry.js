@@ -13,11 +13,16 @@
 const workflowService = require('./workflowService');
 const { buildSessionContext } = require('./contextBuilder');
 
-// Actions that mutate nothing and are already exposed via a READ_TOOL below.
+// Actions kept out of the write-tool surface:
+//  - getTrackFx / getFxParameters: read-only, already exposed as READ_TOOLS
+//    (get_track_fx / get_fx_parameters) below.
+//  - getTrackPeaks: transient real-time meter data with no meaningful
+//    "plan and execute later" semantics — intentionally omitted from the
+//    agent's toolset (it has no corresponding read tool).
 const EXCLUDED = new Set(['getTrackFx', 'getFxParameters', 'getTrackPeaks']);
 
 const trackIdProp = {
-  trackId: { type: 'string', description: 'Track id (e.g. "track_2"). Omit to target the selected track.' },
+  trackId: { type: 'string', description: 'Track id (e.g. "track_2"). Omit to target the currently selected track.' },
   trackIndex: { type: 'number', description: '0-based track index. Used to resolve the track if trackId is not provided.' }
 };
 
@@ -309,18 +314,62 @@ function actionTool(a) {
   };
 }
 
+// A few workflows have common, well-known parameters worth exposing at the
+// top level so the model supplies them directly instead of forgetting to nest
+// them under a generic `args` object. Everything else falls back to a generic
+// optional `args` object.
+const WORKFLOW_SCHEMAS = {
+  preparePunchIn: {
+    properties: {
+      startBar: { type: 'number', description: 'Bar to start the punch-in range' },
+      endBar: { type: 'number', description: 'Bar to end the punch-in range' }
+    }
+  },
+  quickPunchLoop: {
+    properties: {
+      startBar: { type: 'number', description: 'Bar to start the loop/problem section' },
+      endBar: { type: 'number', description: 'Bar to end the loop/problem section' },
+      preRollBeats: { type: 'number', description: 'Beats of pre-roll before the punch-in' }
+    }
+  }
+};
+
 function workflowTools() {
-  return workflowService.listWorkflows().map((w) => ({
-    def: {
-      name: 'workflow_' + w.name,
-      description: `Workflow: ${w.description}`,
-      input_schema: {
-        type: 'object',
-        properties: { args: { type: 'object', description: 'Optional workflow arguments (e.g. startBar/endBar for punch-ins).' } }
-      }
-    },
-    entry: { kind: 'write', toAction: (input) => ({ type: '__workflow__', workflow: w.name, args: (input && input.args) || {} }) }
-  }));
+  return workflowService.listWorkflows().map((w) => {
+    const custom = WORKFLOW_SCHEMAS[w.name];
+    if (custom) {
+      const fieldNames = Object.keys(custom.properties);
+      return {
+        def: {
+          name: 'workflow_' + w.name,
+          description: `Workflow: ${w.description}`,
+          input_schema: { type: 'object', properties: custom.properties }
+        },
+        entry: {
+          kind: 'write',
+          toAction: (input) => {
+            const args = {};
+            const src = input || {};
+            for (const key of fieldNames) {
+              if (src[key] !== undefined) args[key] = src[key];
+            }
+            return { type: '__workflow__', workflow: w.name, args };
+          }
+        }
+      };
+    }
+    return {
+      def: {
+        name: 'workflow_' + w.name,
+        description: `Workflow: ${w.description}`,
+        input_schema: {
+          type: 'object',
+          properties: { args: { type: 'object', description: 'Optional workflow arguments.' } }
+        }
+      },
+      entry: { kind: 'write', toAction: (input) => ({ type: '__workflow__', workflow: w.name, args: (input && input.args) || {} }) }
+    };
+  });
 }
 
 function buildTools() {
