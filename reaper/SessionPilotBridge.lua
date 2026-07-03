@@ -1390,8 +1390,17 @@ commands.play = function(args)
 end
 
 commands.stop = function(args)
-  -- Action 1016: Transport: Stop
-  reaper.Main_OnCommand(1016, 0)
+  -- Use "Stop (save all recorded media)" (40667) instead of plain Stop (1016).
+  -- Plain Stop, with REAPER's "Prompt to save/delete/rename new files on stop"
+  -- preference enabled, pops a modal after a recording — which blocks this
+  -- script's defer loop and freezes the bridge. 40667 keeps takes and never
+  -- prompts. Falls back to 1016 when nothing was recorded (harmless).
+  local playState = reaper.GetPlayState()
+  if playState == 5 or playState == 6 then
+    reaper.Main_OnCommand(40667, 0) -- recording: stop + save all, no prompt
+  else
+    reaper.Main_OnCommand(1016, 0)  -- not recording: plain stop
+  end
   local cursor = reaper.GetCursorPosition()
   return {
     ok = true,
